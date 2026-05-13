@@ -74,7 +74,13 @@ export class TriageAgent extends Agent {
    * @returns {Promise<TriageResult>}
    */
   async _onRun() {
-    const issues = await this.#fetcher.fetchIssues();
+    let issues;
+    try {
+      issues = await this.#fetcher.fetchIssues();
+    } catch (err) {
+      logger.error('fetch failed', { error: err.message });
+      return { total: 0, classified: 0, labeled: 0, commented: 0, errors: 1 };
+    }
     logger.info('fetched issues for triage', { count: issues.length });
 
     if (issues.length === 0) {

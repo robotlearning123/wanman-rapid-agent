@@ -1,10 +1,20 @@
 /**
  * Tests for src/index.mjs — orchestrator entry point
+ *
+ * Behavioral notes:
+ *   1. process.exit mock safety: process.exit(1) in main() terminates the process.
+ *      Simple lambda mocks (code => {}) don't prevent code after exit from running,
+ *      violating Node's contract. Safe mocks throw after recording to halt execution,
+ *      matching real process.exit behavior.
+ *   2. TriageAgent._onRun() now catches fetch errors gracefully (returns error result
+ *      instead of throwing). This means main()'s catch/process.exit(1) path is only
+ *      reachable via initialize-time failures (e.g., invalid repo format in createResponder).
+ *   3. Agent state machine: run() transitions RUNNING → IDLE on success, not RUNNING → STOPPED.
  */
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import { loadConfig, main } from '../src/index.mjs';
 
 const mockTools = {
@@ -107,23 +117,42 @@ describe('main', () => {
     assert.equal(result.errors, 0);
   });
 
-  it('handles orchestration failure gracefully', async () => {
+  it('returns error result when fetcher fails (agent handles internally)', async () => {
+    const result = await main({
+      repo: 'example/repo',
+      dryRun: true,
+      gcpProject: 'test-project',
+      _tools: {
+        ...mockTools,
+        fetcher: {
+          fetchIssues: async () => { throw new Error('fetch exploded'); },
+        },
+      },
+    });
+
+    assert.equal(result.total, 0);
+    assert.equal(result.errors, 1);
+  });
+
+  it('calls process.exit(1) on initialize failure', async () => {
     const originalExit = process.exit;
     let exitCode = null;
-    process.exit = (code) => { exitCode = code; };
+    process.exit = (code) => {
+      exitCode = code;
+      throw new Error(`process.exit(${code})`);
+    };
 
     try {
       await main({
-        repo: 'example/repo',
+        repo: 'invalid-format',
         dryRun: true,
-        gcpProject: 'test-project',
         _tools: {
-          ...mockTools,
-          fetcher: {
-            fetchIssues: async () => { throw new Error('fetch exploded'); },
-          },
+          fetcher: { async fetchIssues() { return []; } },
+          classifier: { async classify() { return { priority: 'P3', area: 'other', severity: 'minor', summary: 't' }; } },
         },
       });
+    } catch (err) {
+      assert.ok(err.message.includes('process.exit'), `unexpected error: ${err.message}`);
     } finally {
       process.exit = originalExit;
     }
@@ -132,21 +161,15 @@ describe('main', () => {
   });
 
   it('auto-run guard calls main() when executed directly', () => {
-    // Execute index.mjs as a subprocess to cover the process.argv guard
-    // The process will log "wanman-rapid-agent starting" then fail (no real token)
-    // and call process.exit(1) — but the auto-run branch is exercised
-    let stderr;
-    try {
-      stderr = execFileSync('node', ['src/index.mjs'], {
-        cwd: new URL('..', import.meta.url).pathname.replace(/\/$/, ''),
-        encoding: 'utf8',
-        timeout: 10000,
-        env: { ...process.env },
-      });
-    } catch (err) {
-      // Process exits with code 1 due to no GitHub token — expected
-      stderr = err.stderr || '';
-    }
+    const projectRoot = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
+    const result = spawnSync('node', ['src/index.mjs'], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      timeout: 10000,
+      env: { ...process.env, DRY_RUN: 'true' },
+    });
+
+    const stderr = result.stderr || '';
     assert.ok(stderr.includes('wanman-rapid-agent starting'), 'auto-run guard should call main()');
   });
 });
