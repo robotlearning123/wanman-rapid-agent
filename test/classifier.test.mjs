@@ -104,6 +104,30 @@ describe('parseResponse', () => {
   it('throws on invalid JSON', () => {
     assert.throws(() => parseResponse('not json at all'), { name: 'SyntaxError' });
   });
+
+  it('defaults severity to minor for invalid value', () => {
+    const raw = '{"priority":"P1","area":"bug","severity":"UNKNOWN","summary":"x"}';
+    const result = parseResponse(raw);
+    assert.equal(result.severity, 'minor');
+  });
+
+  it('defaults summary to empty string when not a string', () => {
+    const raw = '{"priority":"P1","area":"bug","severity":"major","summary":42}';
+    const result = parseResponse(raw);
+    assert.equal(result.summary, '');
+  });
+});
+
+describe('classify method', () => {
+  it('returns fallback when Vertex AI is unavailable', async () => {
+    const clf = createClassifier({ project: 'dry-run' });
+    const result = await clf.classify({ title: 'Test issue', body: 'body', labels: [] });
+    // In dry-run / no-credentials env, classify catches the error and returns defaults
+    assert.equal(result.priority, Priority.P3);
+    assert.equal(result.area, Area.OTHER);
+    assert.equal(result.severity, Severity.MINOR);
+    assert.ok(result.summary.includes('unavailable'));
+  });
 });
 
 describe('enum exports', () => {

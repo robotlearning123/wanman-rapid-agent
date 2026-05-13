@@ -14,7 +14,7 @@ describe('classificationToLabels', () => {
 
   it('omits missing fields', () => {
     const labels = classificationToLabels({ priority: 'P2', area: '', severity: '' });
-    assert.deepEqual(labels, ['priority:P2', 'area:', 'severity:']);
+    assert.deepEqual(labels, ['priority:P2']);
   });
 
   it('returns empty array for empty classification', () => {
