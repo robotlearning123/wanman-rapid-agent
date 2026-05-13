@@ -135,6 +135,7 @@ All configuration is via environment variables:
 | `GOOGLE_CLOUD_LOCATION` | No | `us-central1` | Vertex AI region |
 | `GCS_BUCKET` | No | — | Cloud Storage bucket for run-report JSON artifacts |
 | `GCS_PREFIX` | No | `triage-runs` | Cloud Storage object prefix for run reports |
+| `VERTEX_MODEL` | No | `gemini-1.5-flash` | Vertex AI model name for classification |
 | `DRY_RUN` | No | `true` | Set to `false` to apply labels and post comments |
 
 ## Usage
