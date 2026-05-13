@@ -35,4 +35,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Dev dependencies | 1 (`c8`) |
 | CI | GitHub Actions (Node 18, 20) |
 
-[0.1.0]: https://github.com/your-org/wanman-rapid-agent/releases/tag/v0.1.0
+[0.1.0]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.0
