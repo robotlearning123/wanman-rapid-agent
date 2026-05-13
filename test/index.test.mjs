@@ -5,6 +5,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+const mockTools = {
+  fetcher: { async fetchIssues() { return []; } },
+  classifier: { async classify() { return { priority: 'P3', area: 'other', severity: 'minor', summary: 'test' }; } },
+  responder: { async applyLabels() { return []; }, async postComment() { return true; } },
+};
+
 describe('loadConfig', () => {
   it('exports loadConfig function', async () => {
     const mod = await import('../src/index.mjs');
@@ -21,6 +27,13 @@ describe('loadConfig', () => {
 });
 
 describe('main', () => {
+  const testConfig = {
+    repo: 'example/repo',
+    dryRun: true,
+    gcpProject: 'test-project',
+    _tools: mockTools,
+  };
+
   it('exports main as a function', async () => {
     const mod = await import('../src/index.mjs');
     assert.equal(typeof mod.main, 'function');
@@ -28,11 +41,7 @@ describe('main', () => {
 
   it('main returns triage results with correct shape', async () => {
     const mod = await import('../src/index.mjs?' + Date.now());
-    const result = await mod.main({
-      repo: 'example/repo',
-      dryRun: true,
-      gcpProject: 'test-project',
-    });
+    const result = await mod.main(testConfig);
     assert.equal(typeof result.total, 'number');
     assert.equal(typeof result.classified, 'number');
     assert.equal(typeof result.errors, 'number');
@@ -46,11 +55,7 @@ describe('main', () => {
     process.stderr.write = (chunk) => chunks.push(chunk);
     try {
       const mod = await import('../src/index.mjs?' + Date.now() + 'b');
-      await mod.main({
-        repo: 'example/repo',
-        dryRun: true,
-        gcpProject: 'test-project',
-      });
+      await mod.main(testConfig);
     } finally {
       process.stderr.write = original;
     }
@@ -61,11 +66,7 @@ describe('main', () => {
 
   it('main accepts configOverride parameter', async () => {
     const mod = await import('../src/index.mjs?' + Date.now() + 'c');
-    const result = await mod.main({
-      repo: 'example/repo',
-      dryRun: true,
-      gcpProject: 'test',
-    });
+    const result = await mod.main(testConfig);
     assert.ok(result);
   });
 });

@@ -118,6 +118,7 @@ export function createClassifier({
   project,
   location = 'us-central1',
   model = 'gemini-1.5-flash',
+  callAI = callVertexAI,
 }) {
   if (!project) {
     throw new Error('Classifier requires a Google Cloud project ID');
@@ -147,7 +148,7 @@ export function createClassifier({
       });
 
       try {
-        const response = await callVertexAI({
+        const response = await callAI({
           project: this.project,
           location: this.location,
           model: this.model,
