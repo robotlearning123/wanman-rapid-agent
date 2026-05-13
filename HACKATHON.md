@@ -54,6 +54,6 @@ npm start
 - [x] Cloud Storage SDK run-report artifact path
 - [x] Real use case — autonomous GitHub issue triage
 - [x] README with architecture diagram, setup, and usage guide
-- [x] Test suite (node --test, 133 tests, all passing)
+- [x] Test suite (node --test, 148 tests, all passing)
 - [x] Devpost-ready submission writeup (this file)
 - [x] Demo recording (docs/demo.txt)

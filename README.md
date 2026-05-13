@@ -45,7 +45,7 @@ src/
     logger.mjs         Structured JSON logger (stderr)
     retry.mjs          Exponential backoff helper
 test/
-  *.test.mjs           Node.js test runner suite (133 tests)
+  *.test.mjs           Node.js test runner suite (148 tests)
 ```
 
 ### Agent Flow
