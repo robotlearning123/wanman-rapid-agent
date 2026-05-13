@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-05-13
+
+### Added
+
+- `withRetry` utility — exponential backoff with configurable delays, custom retry predicate, and retry event callback
+- `StorageTool` — Cloud Storage run-report sink; writes JSON triage reports to GCS when `GCS_BUCKET` is configured
+- `google-auth-library` and `@google-cloud/storage` production dependencies for GCS persistence
+- Retry/backoff integration in `FetcherTool`, `ClassifierTool`, and `TriageAgent` for resilient API calls
+- `--storage` CLI flag to enable Cloud Storage output
+- 8 new tests for retry utility and storage tool; expanded triage/classifier/fetcher coverage
+
+### Changed
+
+- README.md updated with retry and GCS storage documentation
+- HACKATHON.md updated with v0.1.1 feature checklist
+
+### Project Stats
+
+| Metric | Value |
+|--------|-------|
+| Source files | 9 |
+| Test files | 9 |
+| Tests | 133 (all passing) |
+| Dependencies | 3 (`@octokit/rest`, `@google-cloud/storage`, `google-auth-library`) |
+| Dev dependencies | 1 (`c8`) |
+| CI | GitHub Actions (Node 18, 20) |
+
 ## [0.1.0] - 2026-05-13
 
 ### Added
@@ -35,4 +62,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Dev dependencies | 1 (`c8`) |
 | CI | GitHub Actions (Node 18, 20) |
 
-[0.1.0]: https://github.com/your-org/wanman-rapid-agent/releases/tag/v0.1.0
+[0.1.1]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.1
+[0.1.0]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.0
