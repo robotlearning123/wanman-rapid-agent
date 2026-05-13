@@ -26,6 +26,8 @@ export function loadConfig() {
     gcpProject: process.env.GOOGLE_CLOUD_PROJECT || '',
     gcpLocation: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
     gcpModel: process.env.VERTEX_MODEL || 'gemini-1.5-flash',
+    gcsBucket: process.env.GCS_BUCKET || '',
+    gcsPrefix: process.env.GCS_PREFIX || 'triage-runs',
     dryRun: process.env.DRY_RUN !== 'false', // default: true for safety
   };
 }

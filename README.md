@@ -4,7 +4,7 @@ Autonomous multi-agent system that triages GitHub issues using Google Cloud Vert
 
 ## What It Does
 
-wanman-rapid-agent connects to a GitHub repository, fetches open issues, classifies them by priority / area / severity using Vertex AI, and applies labels automatically. It runs as a standalone CLI or as a GitHub Action.
+wanman-rapid-agent connects to a GitHub repository, fetches open issues, classifies them by priority / area / severity using Vertex AI, and applies labels automatically. It runs as a standalone CLI or as a GitHub Action. When `GCS_BUCKET` is configured, each run also writes a JSON report to Google Cloud Storage for auditability and demo evidence.
 
 ## Architecture
 
@@ -125,6 +125,8 @@ All configuration is via environment variables:
 | `GOOGLE_CLOUD_PROJECT` | Yes | — | GCP project ID |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Yes | — | Path to service account key JSON |
 | `GOOGLE_CLOUD_LOCATION` | No | `us-central1` | Vertex AI region |
+| `GCS_BUCKET` | No | — | Cloud Storage bucket for run-report JSON artifacts |
+| `GCS_PREFIX` | No | `triage-runs` | Cloud Storage object prefix for run reports |
 | `DRY_RUN` | No | `true` | Set to `false` to apply labels and post comments |
 
 ## Usage
@@ -199,6 +201,12 @@ wanman-rapid-agent calls the **Vertex AI API** to classify GitHub issues:
 - **Input**: Issue title + body + labels
 - **Output**: Structured JSON with `priority` (P0–P4), `area` (bug/feature/docs/infra), and `severity` (critical/major/minor)
 - **Auth**: Service account key via `GOOGLE_APPLICATION_CREDENTIALS`
+
+It also uses the **Google Cloud Storage SDK** when `GCS_BUCKET` is set:
+
+- **Bucket**: `GCS_BUCKET`
+- **Object path**: `${GCS_PREFIX}/<owner-repo>/<timestamp>.json`
+- **Payload**: run configuration, total/classified/labeled/commented/error counts, per-issue details, and persistence metadata
 
 The system is designed so the AI layer is swappable — replace the classifier tool to use a different model or provider without changing the agent orchestration.
 

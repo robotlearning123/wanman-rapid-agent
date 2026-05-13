@@ -9,6 +9,7 @@
  */
 
 import { logger } from '../utils/logger.mjs';
+import { withRetry, DEFAULT_RETRY_DELAYS_MS } from '../utils/retry.mjs';
 
 /**
  * Valid classification labels.
@@ -35,6 +36,14 @@ export const Severity = Object.freeze({
   MAJOR: 'major',
   MINOR: 'minor',
 });
+
+function isRetryableAiError(err) {
+  const message = String(err?.message ?? '');
+  return err?.code !== 'ENOENT'
+    && !message.includes('Could not load the default credentials')
+    && !message.includes('GOOGLE_APPLICATION_CREDENTIALS')
+    && !message.includes('does not exist, or it is not a file');
+}
 
 /**
  * Build the classification prompt sent to Vertex AI.
@@ -111,7 +120,7 @@ function validateEnum(value, enumObj, fallback) {
 /**
  * Create a classifier tool bound to a Vertex AI project.
  *
- * @param {{ project: string, location?: string, model?: string }} opts
+ * @param {{ project: string, location?: string, model?: string, retryDelaysMs?: number[], retrySleep?: function }} opts
  * @returns {{ classify(issue: object): Promise<object> }}
  */
 export function createClassifier({
@@ -119,6 +128,8 @@ export function createClassifier({
   location = 'us-central1',
   model = 'gemini-1.5-flash',
   callAI = callVertexAI,
+  retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
+  retrySleep,
 }) {
   if (!project) {
     throw new Error('Classifier requires a Google Cloud project ID');
@@ -148,12 +159,27 @@ export function createClassifier({
       });
 
       try {
-        const response = await callAI({
-          project: this.project,
-          location: this.location,
-          model: this.model,
-          prompt,
-        });
+        const response = await withRetry(
+          () => callAI({
+            project: this.project,
+            location: this.location,
+            model: this.model,
+            prompt,
+          }),
+          {
+            delaysMs: retryDelaysMs,
+            sleepFn: retrySleep,
+            shouldRetry: isRetryableAiError,
+            onRetry: ({ attempt, nextAttempt, delayMs, error }) => {
+              logger.warn('classification retry scheduled', {
+                attempt,
+                nextAttempt,
+                delayMs,
+                error: error.message,
+              });
+            },
+          },
+        );
 
         const result = parseResponse(response);
         logger.info('classification result', { priority: result.priority, area: result.area, severity: result.severity });

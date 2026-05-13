@@ -11,6 +11,7 @@ An autonomous multi-agent system that triages GitHub issues using Google Cloud V
 ## Google Cloud Integration
 
 - **Vertex AI API** — classifies issues using Gemini with structured JSON output
+- **Cloud Storage SDK** — stores optional JSON run reports for audit trails and demo evidence
 - **Service Account auth** — production-grade IAM with least-privilege roles
 - **Region-configurable** — works in any Vertex AI region (default: us-central1)
 
@@ -26,7 +27,7 @@ Built entirely by an autonomous agent matrix (wanman v0.4.0) — a CEO agent dec
 
 ### How We Used Google Cloud
 
-We use the **Vertex AI API** to classify GitHub issues. Each issue (title + body) is sent to the Gemini model with a structured prompt that returns priority, area, and severity labels. Authentication uses a GCP service account with the `aiplatform.user` role. The system is designed to be model-agnostic — the classifier tool can be swapped for any Vertex AI model without changing the orchestration layer.
+We use the **Vertex AI API** to classify GitHub issues. Each issue (title + body) is sent to the Gemini model with a structured prompt that returns priority, area, and severity labels. Authentication uses a GCP service account with the `aiplatform.user` role. When `GCS_BUCKET` is configured, the app also uses the Google Cloud Storage SDK to save each run report as JSON under `GCS_PREFIX`, giving judges a durable audit artifact for the autonomous triage flow. The system is designed to be model-agnostic — the classifier tool can be swapped for any Vertex AI model without changing the orchestration layer.
 
 ### Setup Instructions
 
@@ -49,7 +50,8 @@ npm start
 
 ## Deliverables Checklist
 
-- [x] Working multi-agent system with Google Cloud SDK calls (Vertex AI)
+- [x] Working multi-agent system with Google Cloud calls (Vertex AI + Cloud Storage SDK)
+- [x] Cloud Storage SDK run-report artifact path
 - [x] Real use case — autonomous GitHub issue triage
 - [x] README with architecture diagram, setup, and usage guide
 - [x] Test suite (node --test, 125 tests, all passing)

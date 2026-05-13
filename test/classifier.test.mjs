@@ -59,6 +59,7 @@ describe('createClassifier', () => {
     const clf = createClassifier({
       project: 'test-project',
       callAI: async () => { throw new Error('network error'); },
+      retryDelaysMs: [],
     });
 
     const result = await clf.classify({ title: 'Test', body: 'Body', labels: [] });
@@ -66,6 +67,29 @@ describe('createClassifier', () => {
     assert.equal(result.area, Area.OTHER);
     assert.equal(result.severity, Severity.MINOR);
     assert.ok(result.summary.includes('unavailable'));
+  });
+
+  it('classify — retries transient Vertex AI failures with backoff', async () => {
+    const delays = [];
+    let calls = 0;
+    const clf = createClassifier({
+      project: 'test-project',
+      retryDelaysMs: [1000, 2000, 4000],
+      retrySleep: async (ms) => { delays.push(ms); },
+      callAI: async () => {
+        calls++;
+        if (calls < 3) throw new Error('temporary Vertex AI error');
+        return '{"priority":"P2","area":"infra","severity":"major","summary":"Recovered"}';
+      },
+    });
+
+    const result = await clf.classify({ title: 'Flaky infra', body: 'Intermittent failure', labels: [] });
+
+    assert.equal(calls, 3);
+    assert.deepEqual(delays, [1000, 2000]);
+    assert.equal(result.priority, 'P2');
+    assert.equal(result.area, 'infra');
+    assert.equal(result.severity, 'major');
   });
 });
 
@@ -232,30 +256,50 @@ describe('callVertexAI', () => {
     );
   });
 
-  it('attempts google-auth-library import when getAccessToken not provided', async () => {
-    // Without getAccessToken, callVertexAI tries to import google-auth-library
-    // which is not installed, so it throws a module-not-found error
-    await assert.rejects(
-      () => callVertexAI({
-        project: 'test-proj',
-        location: 'us-central1',
-        model: 'gemini-1.5-flash',
-        prompt: 'test',
-        fetchImpl: async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{}' }] } }] }) }),
-      }),
-      { code: 'ERR_MODULE_NOT_FOUND' },
-    );
+  it('uses google-auth-library when getAccessToken is not provided', async () => {
+    const previousCredentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = '/tmp/wanman-rapid-agent-missing-key.json';
+
+    try {
+      await assert.rejects(
+        () => callVertexAI({
+          project: 'test-proj',
+          location: 'us-central1',
+          model: 'gemini-1.5-flash',
+          prompt: 'test',
+          fetchImpl: async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{}' }] } }] }) }),
+        }),
+        { code: 'ENOENT' },
+      );
+    } finally {
+      if (previousCredentials === undefined) {
+        delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+      } else {
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = previousCredentials;
+      }
+    }
   });
 });
 
 describe('classify method (no callAI injection)', () => {
   it('returns fallback when Vertex AI is unavailable', async () => {
-    const clf = createClassifier({ project: 'dry-run' });
-    const result = await clf.classify({ title: 'Test issue', body: 'body', labels: [] });
-    assert.equal(result.priority, Priority.P3);
-    assert.equal(result.area, Area.OTHER);
-    assert.equal(result.severity, Severity.MINOR);
-    assert.ok(result.summary.includes('unavailable'));
+    const previousCredentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = '/tmp/wanman-rapid-agent-missing-key.json';
+
+    try {
+      const clf = createClassifier({ project: 'dry-run' });
+      const result = await clf.classify({ title: 'Test issue', body: 'body', labels: [] });
+      assert.equal(result.priority, Priority.P3);
+      assert.equal(result.area, Area.OTHER);
+      assert.equal(result.severity, Severity.MINOR);
+      assert.ok(result.summary.includes('unavailable'));
+    } finally {
+      if (previousCredentials === undefined) {
+        delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+      } else {
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = previousCredentials;
+      }
+    }
   });
 });
 

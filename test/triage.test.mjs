@@ -113,7 +113,7 @@ describe('TriageAgent', () => {
       fetcher: { async fetchIssues() { return [sampleIssue]; } },
       classifier: { async classify() { return classifyResult; } },
       responder: {
-        async applyLabels(n, cls) { const l = ['priority:P1']; appliedLabels.push({ n, l }); return l; },
+        async applyLabels(n, _cls) { const l = ['priority:P1']; appliedLabels.push({ n, l }); return l; },
         async postComment() { return true; },
       },
     };
@@ -128,6 +128,49 @@ describe('TriageAgent', () => {
     assert.equal(result.commented, 1);
     assert.equal(result.errors, 0);
     assert.equal(result.details[0].number, 1);
+  });
+
+  it('run — persists a Cloud Storage report through injected storage', async () => {
+    const savedReports = [];
+    const tools = {
+      ...makeMockTools({ issues: [sampleIssue] }),
+      storage: {
+        async saveRunReport(report) {
+          savedReports.push(report);
+          return { saved: true, bucket: 'demo-bucket', path: 'triage-runs/test-repo/report.json' };
+        },
+      },
+    };
+
+    const agent = new TriageAgent({ ...baseConfig, _tools: tools });
+    await agent.initialize();
+    const result = await agent.run();
+
+    assert.equal(result.storage.saved, true);
+    assert.equal(result.storage.bucket, 'demo-bucket');
+    assert.equal(savedReports.length, 1);
+    assert.equal(savedReports[0].repo, 'test/repo');
+    assert.equal(savedReports[0].result.total, 1);
+  });
+
+  it('run — reports Cloud Storage failures without failing triage', async () => {
+    const tools = {
+      ...makeMockTools({ issues: [sampleIssue] }),
+      storage: {
+        async saveRunReport() {
+          throw new Error('storage unavailable');
+        },
+      },
+    };
+
+    const agent = new TriageAgent({ ...baseConfig, _tools: tools });
+    await agent.initialize();
+    const result = await agent.run();
+
+    assert.equal(result.total, 1);
+    assert.equal(result.errors, 0);
+    assert.equal(result.storage.saved, false);
+    assert.equal(result.storage.error, 'storage unavailable');
   });
 
   it('run — handles per-issue errors gracefully', async () => {
@@ -199,24 +242,35 @@ describe('TriageAgent', () => {
     assert.equal(result.total, 0);
   });
 
-  it('creates classifier from gcpProject when _tools.classifier not provided', async () => {
-    // Covers the _tools?.classifier undefined + gcpProject truthy branch
-    const tools = {
-      fetcher: { async fetchIssues() { return [sampleIssue]; } },
-      responder: { async applyLabels() { return ['priority:P3']; }, async postComment() { return true; } },
-    };
-    const agent = new TriageAgent({
-      repo: 'test/repo',
-      dryRun: true,
-      gcpProject: 'my-gcp-project',
-      _tools: tools,
-    });
-    await agent.initialize();
-    // The classifier is created from gcpProject but classify() will fail
-    // because google-auth-library isn't installed — it falls back to defaults
-    const result = await agent.run();
-    assert.equal(result.total, 1);
-    assert.equal(result.classified, 1);
-    assert.equal(result.errors, 0);
-  });
+ it('creates classifier from gcpProject when _tools.classifier not provided', async () => {
+   // Covers the _tools?.classifier undefined + gcpProject truthy branch
+    const previousCredentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = '/tmp/wanman-rapid-agent-missing-key.json';
+   const tools = {
+     fetcher: { async fetchIssues() { return [sampleIssue]; } },
+     responder: { async applyLabels() { return ['priority:P3']; }, async postComment() { return true; } },
+   };
+
+    try {
+      const agent = new TriageAgent({
+        repo: 'test/repo',
+        dryRun: true,
+        gcpProject: 'my-gcp-project',
+        _tools: tools,
+      });
+      await agent.initialize();
+      // The classifier is created from gcpProject but classify() will fail
+      // without credentials, then fall back to safe defaults.
+      const result = await agent.run();
+      assert.equal(result.total, 1);
+      assert.equal(result.classified, 1);
+      assert.equal(result.errors, 0);
+    } finally {
+      if (previousCredentials === undefined) {
+        delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+      } else {
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = previousCredentials;
+      }
+    }
+ });
 });
