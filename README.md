@@ -40,18 +40,20 @@ src/
     fetcher.mjs        GitHub issue fetcher (Octokit)
     classifier.mjs     Vertex AI classification (priority/area/severity)
     responder.mjs      Auto-label and comment on issues
+    storage.mjs        Cloud Storage run-report persistence
   utils/
     logger.mjs         Structured JSON logger (stderr)
+    retry.mjs          Exponential backoff helper
 test/
-  *.test.mjs           Node.js test runner suite
+  *.test.mjs           Node.js test runner suite (133 tests)
 ```
 
 ### Agent Flow
 
-1. **Fetch** — Pull open issues from the target GitHub repository via Octokit
-2. **Classify** — Send each issue body + title to Vertex AI for structured classification
+1. **Fetch** — Pull open issues from the target GitHub repository via Octokit, with retry for transient failures
+2. **Classify** — Send each issue body + title to Vertex AI for structured classification, with retry for transient failures
 3. **Respond** — Apply priority/area/severity labels; post a triage summary comment
-4. **Report** — Log results and exit with appropriate status code
+4. **Report** — Log results, optionally persist a JSON run report to Google Cloud Storage, and exit with appropriate status code
 
 ## Prerequisites
 
@@ -109,7 +111,7 @@ export GOOGLE_CLOUD_LOCATION="us-central1"  # or your preferred region
 ## Installation
 
 ```bash
-git clone https://github.com/your-org/wanman-rapid-agent.git
+git clone https://github.com/robotlearning123/wanman-rapid-agent.git
 cd wanman-rapid-agent
 npm install
 ```
@@ -183,6 +185,7 @@ jobs:
 
 ```bash
 npm test
+npm run lint
 ```
 
 The test suite uses the [Node.js built-in test runner](https://nodejs.org/api/test.html) (`node --test`) and covers:
@@ -190,6 +193,8 @@ The test suite uses the [Node.js built-in test runner](https://nodejs.org/api/te
 - Agent core: TriageAgent initialization and run lifecycle
 - Classifier: Vertex AI response parsing and label mapping
 - Fetcher: GitHub API pagination and error handling
+- Storage: Cloud Storage run-report persistence
+- Retry: exponential backoff behavior for transient failures
 - Logger: structured output format
 - Integration: end-to-end dry-run flow
 
@@ -197,7 +202,7 @@ The test suite uses the [Node.js built-in test runner](https://nodejs.org/api/te
 
 wanman-rapid-agent calls the **Vertex AI API** to classify GitHub issues:
 
-- **Model**: Gemini (configured via `GOOGLE_CLOUD_LOCATION`)
+- **Model**: Gemini (configured via `VERTEX_MODEL`; defaults to `gemini-1.5-flash`)
 - **Input**: Issue title + body + labels
 - **Output**: Structured JSON with `priority` (P0–P4), `area` (bug/feature/docs/infra), and `severity` (critical/major/minor)
 - **Auth**: Service account key via `GOOGLE_APPLICATION_CREDENTIALS`
@@ -216,6 +221,7 @@ The system is designed so the AI layer is swappable — replace the classifier t
 - **GitHub Integration**: [Octokit](https://github.com/octokit/octokit.js)
 - **AI**: Google Cloud Vertex AI
 - **Testing**: [Node.js test runner](https://nodejs.org/api/test.html) (built-in, zero dependencies)
+- **Linting**: ESLint 9 flat config
 - **Agent Orchestration**: wanman agent matrix (CEO + dev + devops agents)
 
 ## License
