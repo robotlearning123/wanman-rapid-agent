@@ -52,6 +52,6 @@ npm start
 - [x] Working multi-agent system with Google Cloud SDK calls (Vertex AI)
 - [x] Real use case — autonomous GitHub issue triage
 - [x] README with architecture diagram, setup, and usage guide
-- [x] Test suite (Vitest, 5+ tests)
+- [x] Test suite (node --test, 119 tests, 99.6% line coverage)
 - [x] Devpost-ready submission writeup (this file)
 - [ ] Demo recording

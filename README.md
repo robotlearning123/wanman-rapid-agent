@@ -43,7 +43,7 @@ src/
   utils/
     logger.mjs         Structured JSON logger (stderr)
 test/
-  *.test.mjs           Vitest test suite
+  *.test.mjs           Node.js test runner suite
 ```
 
 ### Agent Flow
@@ -183,7 +183,7 @@ jobs:
 npm test
 ```
 
-The test suite uses [Vitest](https://vitest.dev/) and covers:
+The test suite uses the [Node.js built-in test runner](https://nodejs.org/api/test.html) (`node --test`) and covers:
 
 - Agent core: TriageAgent initialization and run lifecycle
 - Classifier: Vertex AI response parsing and label mapping
@@ -207,7 +207,7 @@ The system is designed so the AI layer is swappable — replace the classifier t
 - **Runtime**: Node.js 18+ (ESM)
 - **GitHub Integration**: [Octokit](https://github.com/octokit/octokit.js)
 - **AI**: Google Cloud Vertex AI
-- **Testing**: [Vitest](https://vitest.dev/)
+- **Testing**: [Node.js test runner](https://nodejs.org/api/test.html) (built-in, zero dependencies)
 - **Agent Orchestration**: wanman agent matrix (CEO + dev + devops agents)
 
 ## License

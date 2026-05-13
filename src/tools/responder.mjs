@@ -61,8 +61,8 @@ export function buildComment(classification) {
  * @param {{ token?: string, repo: string, dryRun?: boolean }} opts
  * @returns {{ applyLabels(number, object): Promise<string[]>, postComment(number, string): Promise<boolean> }}
  */
-export function createResponder({ token, repo, dryRun = true }) {
-  const octokit = token ? new Octokit({ auth: token }) : null;
+export function createResponder({ token, repo, dryRun = true, client }) {
+  const octokit = client ?? (token ? new Octokit({ auth: token }) : null);
   const [owner, repository] = repo.split('/');
 
   if (!owner || !repository) {
