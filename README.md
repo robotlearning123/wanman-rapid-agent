@@ -21,12 +21,12 @@ wanman-rapid-agent connects to a GitHub repository, fetches open issues, classif
 │  Action  │    │                              │    │   summarize)    │
 └──────────┘    └──────────────────────────────┘    └─────────────────┘
                           │
-                 ┌────────┼────────┐
-                 ▼        ▼        ▼
-            ┌────────┐┌────────┐┌──────────┐
-            │ Fetcher ││Classifier││Responder │
-            │ Tool    ││ Tool     ││ Tool     │
-            └─────────┘└──────────┘└──────────┘
+                 ┌────────┼────────┬────────┐
+                 ▼        ▼        ▼        ▼
+            ┌────────┐┌────────┐┌──────────┐┌───────────────┐
+            │ Fetcher ││Classifier││Responder ││ Cloud Storage │
+            │ Tool    ││ Tool     ││ Tool     ││ Report Sink   │
+            └─────────┘└──────────┘└──────────┘└───────────────┘
 ```
 
 ### Directory Layout
@@ -58,7 +58,7 @@ test/
 ## Prerequisites
 
 - **Node.js** 18+ (ESM support required)
-- **Google Cloud account** with Vertex AI API enabled
+- **Google Cloud account** with Vertex AI API and Cloud Storage API enabled
 - **GitHub Personal Access Token** with `repo` scope (or `public_repo` for public repos)
 - **npm** for dependency management
 
@@ -77,6 +77,7 @@ gcloud config set project $PROJECT_ID
 ```bash
 gcloud services enable aiplatform.googleapis.com
 gcloud services enable cloudresourcemanager.googleapis.com
+gcloud services enable storage.googleapis.com
 ```
 
 ### 3. Create a Service Account
@@ -89,6 +90,10 @@ gcloud iam service-accounts create $SA_NAME \
 gcloud projects add-iam-policy-binding $PROJECT_ID \
   --member="serviceAccount:${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
   --role="roles/aiplatform.user"
+
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+  --member="serviceAccount:${SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/storage.objectCreator"
 ```
 
 ### 4. Generate a Key File

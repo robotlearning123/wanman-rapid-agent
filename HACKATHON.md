@@ -11,7 +11,7 @@ An autonomous multi-agent system that triages GitHub issues using Google Cloud V
 ## Google Cloud Integration
 
 - **Vertex AI API** — classifies issues using Gemini with structured JSON output
-- **Cloud Storage SDK** — stores optional JSON run reports for audit trails and demo evidence
+- **Cloud Storage API + SDK** — stores optional JSON run reports for audit trails and demo evidence
 - **Service Account auth** — production-grade IAM with least-privilege roles
 - **Region-configurable** — works in any Vertex AI region (default: us-central1)
 
@@ -54,6 +54,6 @@ npm start
 - [x] Cloud Storage SDK run-report artifact path
 - [x] Real use case — autonomous GitHub issue triage
 - [x] README with architecture diagram, setup, and usage guide
-- [x] Test suite (node --test, 125 tests, all passing)
+- [x] Test suite (node --test, 133 tests, all passing)
 - [x] Devpost-ready submission writeup (this file)
 - [x] Demo recording (docs/demo.txt)
