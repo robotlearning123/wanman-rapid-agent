@@ -13,13 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `StorageTool` — Cloud Storage run-report sink; writes JSON triage reports to GCS when `GCS_BUCKET` is configured
 - `google-auth-library` and `@google-cloud/storage` production dependencies for GCS persistence
 - Retry/backoff integration in `FetcherTool`, `ClassifierTool`, and `TriageAgent` for resilient API calls
-- `--storage` CLI flag to enable Cloud Storage output
+- `GCS_BUCKET` and `GCS_PREFIX` configuration for Cloud Storage output
+- ESLint 9 flat config with `npm run lint` and `npm run lint:fix`
 - 8 new tests for retry utility and storage tool; expanded triage/classifier/fetcher coverage
 
 ### Changed
 
 - README.md updated with retry and GCS storage documentation
 - HACKATHON.md updated with v0.1.1 feature checklist
+- Existing unused-symbol lint warnings cleaned up so the lint gate is warning-free
 
 ### Project Stats
 
@@ -29,8 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Test files | 9 |
 | Tests | 133 (all passing) |
 | Dependencies | 3 (`@octokit/rest`, `@google-cloud/storage`, `google-auth-library`) |
-| Dev dependencies | 1 (`c8`) |
-| CI | GitHub Actions (Node 18, 20) |
+| Dev dependencies | 3 (`c8`, `eslint`, `eslint-plugin-n`) |
+| CI | GitHub Actions (Node 18, 20), plus local lint gate |
 
 ## [0.1.0] - 2026-05-13
 
