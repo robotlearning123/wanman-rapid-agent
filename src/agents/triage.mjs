@@ -1,0 +1,156 @@
+/**
+ * TriageAgent — orchestrates GitHub issue triage using AI classification
+ *
+ * Workflow: fetch issues → classify each → apply labels + post comments
+ * Extends the Agent base class for lifecycle management and state tracking.
+ */
+
+import { Agent, AgentState } from './base.mjs';
+import { createFetcher } from '../tools/fetcher.mjs';
+import { createClassifier } from '../tools/classifier.mjs';
+import { createResponder, buildComment } from '../tools/responder.mjs';
+import { logger } from '../utils/logger.mjs';
+
+/**
+ * @typedef {import('../tools/fetcher.mjs').NormalizedIssue} NormalizedIssue
+ */
+
+/**
+ * @typedef {object} TriageResult
+ * @property {number} total - total issues processed
+ * @property {number} classified - successfully classified
+ * @property {number} labeled - labels applied
+ * @property {number} commented - comments posted
+ * @property {number} errors - errors encountered
+ * @property {object[]} [details] - per-issue classification details
+ */
+
+export class TriageAgent extends Agent {
+  /** @type {ReturnType<typeof createFetcher>|null} */
+  #fetcher = null;
+
+  /** @type {ReturnType<typeof createClassifier>|null} */
+  #classifier = null;
+
+  /** @type {ReturnType<typeof createResponder>|null} */
+  #responder = null;
+
+  /**
+   * @param {{
+   *   repo: string,
+   *   token?: string,
+   *   gcpProject?: string,
+   *   gcpLocation?: string,
+   *   gcpModel?: string,
+   *   dryRun?: boolean,
+   * }} config
+   */
+  constructor(config) {
+    super('triage-agent', config);
+  }
+
+  /**
+   * Set up tools from configuration. Called by Agent.initialize().
+   * @protected
+   */
+  async _onInitialize() {
+    const { repo, token, gcpProject, gcpLocation, gcpModel, dryRun } = this.config;
+
+    this.#fetcher = createFetcher({ token, repo });
+
+    this.#classifier = gcpProject
+      ? createClassifier({ project: gcpProject, location: gcpLocation, model: gcpModel })
+      : createClassifier({ project: 'dry-run' });
+
+    this.#responder = createResponder({ token, repo, dryRun: dryRun ?? true });
+
+    logger.info('triage agent initialized', { repo, dryRun });
+  }
+
+  /**
+   * Main triage workflow. Called by Agent.run().
+   *
+   * @protected
+   * @returns {Promise<TriageResult>}
+   */
+  async _onRun() {
+    const issues = await this.#fetcher.fetchIssues();
+    logger.info('fetched issues for triage', { count: issues.length });
+
+    if (issues.length === 0) {
+      return { total: 0, classified: 0, labeled: 0, commented: 0, errors: 0 };
+    }
+
+    const details = [];
+    let classified = 0;
+    let labeled = 0;
+    let commented = 0;
+    let errors = 0;
+
+    for (const issue of issues) {
+      try {
+        const result = await this.#triageIssue(issue);
+        details.push({ number: issue.number, ...result });
+        classified++;
+        if (result.labelsApplied) labeled++;
+        if (result.commentPosted) commented++;
+      } catch (err) {
+        errors++;
+        this.fail(err, 'triage-issue');
+        details.push({ number: issue.number, error: err.message });
+      }
+    }
+
+    logger.info('triage complete', {
+      total: issues.length,
+      classified,
+      labeled,
+      commented,
+      errors,
+    });
+
+    return {
+      total: issues.length,
+      classified,
+      labeled,
+      commented,
+      errors,
+      details,
+    };
+  }
+
+  /**
+   * Process a single issue: classify → label → comment.
+   *
+   * @param {NormalizedIssue} issue
+   * @returns {Promise<{ classification: object, labelsApplied: string[], commentPosted: boolean }>}
+   */
+  async #triageIssue(issue) {
+    // Classify
+    const classification = await this.#classifier.classify({
+      title: issue.title,
+      body: issue.body,
+      labels: issue.labels,
+    });
+
+    // Apply labels
+    const labelsApplied = await this.#responder.applyLabels(issue.number, classification);
+
+    // Post comment
+    const comment = buildComment(classification);
+    const commentPosted = await this.#responder.postComment(issue.number, comment);
+
+    return { classification, labelsApplied, commentPosted };
+  }
+
+  /**
+   * Clean up resources. Called by Agent.stop().
+   * @protected
+   */
+  async _onStop() {
+    this.#fetcher = null;
+    this.#classifier = null;
+    this.#responder = null;
+    logger.info('triage agent stopped');
+  }
+}
