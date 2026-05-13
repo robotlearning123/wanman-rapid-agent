@@ -56,7 +56,7 @@ export function createFetcher({ token, repo }) {
  * @param {import('@octokit/rest').RestEndpointMethodTypes['issues']['listForRepo']['response']['data'][number]} raw
  * @returns {NormalizedIssue}
  */
-function normalize(raw) {
+export function normalize(raw) {
   return {
     number: raw.number,
     title: raw.title,
