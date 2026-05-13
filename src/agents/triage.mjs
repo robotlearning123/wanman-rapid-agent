@@ -96,7 +96,7 @@ export class TriageAgent extends Agent {
         if (result.commentPosted) commented++;
       } catch (err) {
         errors++;
-        this.fail(err, 'triage-issue');
+        logger.warn('issue triage failed', { number: issue.number, error: err.message });
         details.push({ number: issue.number, error: err.message });
       }
     }

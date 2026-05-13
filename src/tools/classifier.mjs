@@ -177,18 +177,20 @@ export function createClassifier({
  * Uses Google Application Default Credentials when available.
  * Falls back gracefully in environments without credentials.
  *
- * @param {{ project: string, location: string, model: string, prompt: string }} opts
+ * @param {{ project: string, location: string, model: string, prompt: string, getAccessToken?: function, fetchImpl?: function }} opts
  * @returns {Promise<string>} raw response text
  */
-async function callVertexAI({ project, location, model, prompt }) {
-  // Dynamic import — only needed when actually calling Vertex AI
-  const { GoogleAuth } = await import('google-auth-library');
-
-  const auth = new GoogleAuth({
-    scopes: ['https://www.googleapis.com/auth/cloud-platform'],
-  });
-
-  const token = await auth.getAccessToken();
+export async function callVertexAI({ project, location, model, prompt, getAccessToken, fetchImpl }) {
+  let token;
+  if (getAccessToken) {
+    token = await getAccessToken();
+  } else {
+    const { GoogleAuth } = await import('google-auth-library');
+    const auth = new GoogleAuth({
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+    token = await auth.getAccessToken();
+  }
 
   const endpoint = `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
 
@@ -201,7 +203,9 @@ async function callVertexAI({ project, location, model, prompt }) {
     },
   };
 
-  const res = await fetch(endpoint, {
+  const _fetch = fetchImpl ?? fetch;
+
+  const res = await _fetch(endpoint, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,

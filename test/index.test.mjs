@@ -2,8 +2,9 @@
  * Tests for src/index.mjs — orchestrator entry point
  */
 
-import { describe, it } from 'node:test';
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { loadConfig, main } from '../src/index.mjs';
 
 const mockTools = {
   fetcher: { async fetchIssues() { return []; } },
@@ -12,17 +13,58 @@ const mockTools = {
 };
 
 describe('loadConfig', () => {
-  it('exports loadConfig function', async () => {
-    const mod = await import('../src/index.mjs');
-    assert.equal(typeof mod.loadConfig, 'function');
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    for (const key of Object.keys(process.env)) {
+      if (!(key in originalEnv)) delete process.env[key];
+    }
+    Object.assign(process.env, originalEnv);
   });
 
-  it('loadConfig returns expected shape', async () => {
-    const mod = await import('../src/index.mjs?' + Date.now());
-    const config = mod.loadConfig();
-    assert.equal(typeof config.repo, 'string');
-    assert.equal(typeof config.dryRun, 'boolean');
-    assert.equal(typeof config.gcpLocation, 'string');
+  it('returns defaults when no env vars set', () => {
+    delete process.env.GITHUB_REPOSITORY;
+    delete process.env.GITHUB_TOKEN;
+    delete process.env.GOOGLE_CLOUD_PROJECT;
+    delete process.env.GOOGLE_CLOUD_LOCATION;
+    delete process.env.VERTEX_MODEL;
+    delete process.env.DRY_RUN;
+
+    const config = loadConfig();
+    assert.equal(config.repo, 'example/repo');
+    assert.equal(config.token, '');
+    assert.equal(config.gcpProject, '');
+    assert.equal(config.gcpLocation, 'us-central1');
+    assert.equal(config.gcpModel, 'gemini-1.5-flash');
+    assert.equal(config.dryRun, true);
+  });
+
+  it('reads configuration from environment variables', () => {
+    process.env.GITHUB_REPOSITORY = 'myorg/myrepo';
+    process.env.GITHUB_TOKEN = 'ghp_abc123';
+    process.env.GOOGLE_CLOUD_PROJECT = 'my-gcp-project';
+    process.env.GOOGLE_CLOUD_LOCATION = 'europe-west1';
+    process.env.VERTEX_MODEL = 'gemini-1.5-pro';
+    process.env.DRY_RUN = 'false';
+
+    const config = loadConfig();
+    assert.equal(config.repo, 'myorg/myrepo');
+    assert.equal(config.token, 'ghp_abc123');
+    assert.equal(config.gcpProject, 'my-gcp-project');
+    assert.equal(config.gcpLocation, 'europe-west1');
+    assert.equal(config.gcpModel, 'gemini-1.5-pro');
+    assert.equal(config.dryRun, false);
+  });
+
+  it('dryRun defaults to true unless DRY_RUN is exactly "false"', () => {
+    process.env.DRY_RUN = 'true';
+    assert.equal(loadConfig().dryRun, true);
+
+    process.env.DRY_RUN = 'yes';
+    assert.equal(loadConfig().dryRun, true);
+
+    delete process.env.DRY_RUN;
+    assert.equal(loadConfig().dryRun, true);
   });
 });
 
@@ -34,14 +76,8 @@ describe('main', () => {
     _tools: mockTools,
   };
 
-  it('exports main as a function', async () => {
-    const mod = await import('../src/index.mjs');
-    assert.equal(typeof mod.main, 'function');
-  });
-
-  it('main returns triage results with correct shape', async () => {
-    const mod = await import('../src/index.mjs?' + Date.now());
-    const result = await mod.main(testConfig);
+  it('returns triage results with correct shape', async () => {
+    const result = await main(testConfig);
     assert.equal(typeof result.total, 'number');
     assert.equal(typeof result.classified, 'number');
     assert.equal(typeof result.errors, 'number');
@@ -49,13 +85,12 @@ describe('main', () => {
     assert.equal(typeof result.commented, 'number');
   });
 
-  it('main logs start and complete messages', async () => {
+  it('logs start and complete messages', async () => {
     const chunks = [];
     const original = process.stderr.write.bind(process.stderr);
     process.stderr.write = (chunk) => chunks.push(chunk);
     try {
-      const mod = await import('../src/index.mjs?' + Date.now() + 'b');
-      await mod.main(testConfig);
+      await main(testConfig);
     } finally {
       process.stderr.write = original;
     }
@@ -64,9 +99,34 @@ describe('main', () => {
     assert.ok(output.includes('orchestration complete'), 'should log complete');
   });
 
-  it('main accepts configOverride parameter', async () => {
-    const mod = await import('../src/index.mjs?' + Date.now() + 'c');
-    const result = await mod.main(testConfig);
-    assert.ok(result);
+  it('returns zero results for empty repo', async () => {
+    const result = await main(testConfig);
+    assert.equal(result.total, 0);
+    assert.equal(result.classified, 0);
+    assert.equal(result.errors, 0);
+  });
+
+  it('handles orchestration failure gracefully', async () => {
+    const originalExit = process.exit;
+    let exitCode = null;
+    process.exit = (code) => { exitCode = code; };
+
+    try {
+      await main({
+        repo: 'example/repo',
+        dryRun: true,
+        gcpProject: 'test-project',
+        _tools: {
+          ...mockTools,
+          fetcher: {
+            fetchIssues: async () => { throw new Error('fetch exploded'); },
+          },
+        },
+      });
+    } finally {
+      process.exit = originalExit;
+    }
+
+    assert.equal(exitCode, 1, 'should call process.exit(1)');
   });
 });
