@@ -28,8 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Metric | Value |
 |--------|-------|
 | Source files | 9 |
-| Test files | 9 |
-| Tests | 133 (all passing) |
+| Test files | 10 |
+| Tests | 148 (all passing) |
 | Dependencies | 3 (`@octokit/rest`, `@google-cloud/storage`, `google-auth-library`) |
 | Dev dependencies | 3 (`c8`, `eslint`, `eslint-plugin-n`) |
 | CI | GitHub Actions (Node 18, 20), plus local lint gate |
