@@ -13,8 +13,8 @@ import { logger } from '../utils/logger.mjs';
  * @param {{ token?: string, repo: string }} opts
  * @returns {{ fetchIssues(): Promise<NormalizedIssue[]> }}
  */
-export function createFetcher({ token, repo }) {
-  const octokit = new Octokit({ auth: token });
+export function createFetcher({ token, repo, client }) {
+  const octokit = client ?? new Octokit({ auth: token });
 
   return {
     /**

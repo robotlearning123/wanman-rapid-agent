@@ -1,31 +1,64 @@
 /**
- * wanman-rapid-agent — entry point
+ * wanman-rapid-agent — entry point and orchestrator
  *
  * A multi-agent system that autonomously triages GitHub issues
  * using Google Cloud Vertex AI for classification.
+ *
+ * Orchestrates the TriageAgent lifecycle:
+ *   1. Read configuration from environment
+ *   2. Initialize the agent (tools, connections)
+ *   3. Run triage (fetch → classify → label → comment)
+ *   4. Report results
  */
 
 import { TriageAgent } from './agents/triage.mjs';
 import { logger } from './utils/logger.mjs';
 
-const REPO = process.env.GITHUB_REPOSITORY || 'example/repo';
-const DRY_RUN = process.env.DRY_RUN !== 'false'; // default: true for safety
+/**
+ * Build agent configuration from environment variables.
+ *
+ * @returns {object} config for TriageAgent
+ */
+export function loadConfig() {
+  return {
+    repo: process.env.GITHUB_REPOSITORY || 'example/repo',
+    token: process.env.GITHUB_TOKEN || '',
+    gcpProject: process.env.GOOGLE_CLOUD_PROJECT || '',
+    gcpLocation: process.env.GOOGLE_CLOUD_LOCATION || 'us-central1',
+    gcpModel: process.env.VERTEX_MODEL || 'gemini-1.5-flash',
+    dryRun: process.env.DRY_RUN !== 'false', // default: true for safety
+  };
+}
 
-export async function main() {
-  logger.info('wanman-rapid-agent starting', { repo: REPO, dryRun: DRY_RUN });
+/**
+ * Main orchestrator — creates, initializes, runs, and reports the TriageAgent.
+ *
+ * @param {object} [configOverride] - override config (useful for testing)
+ * @returns {Promise<object>} triage results
+ */
+export async function main(configOverride) {
+  const config = configOverride ?? loadConfig();
 
-  const agent = new TriageAgent({ repo: REPO, dryRun: DRY_RUN });
+  logger.info('wanman-rapid-agent starting', {
+    repo: config.repo,
+    dryRun: config.dryRun,
+  });
+
+  const agent = new TriageAgent(config);
 
   try {
+    await agent.initialize();
     const results = await agent.run();
-    logger.info('triage complete', {
+
+    logger.info('orchestration complete', {
       total: results.total,
       classified: results.classified,
       errors: results.errors,
     });
+
     return results;
   } catch (err) {
-    logger.error('triage failed', { error: err.message });
+    logger.error('orchestration failed', { error: err.message });
     process.exit(1);
   }
 }

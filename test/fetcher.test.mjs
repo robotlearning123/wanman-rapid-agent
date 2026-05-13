@@ -2,9 +2,9 @@
  * Tests for src/tools/fetcher.mjs
  */
 
-import { describe, it, beforeEach, afterEach, mock } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalize } from '../src/tools/fetcher.mjs';
+import { createFetcher, normalize } from '../src/tools/fetcher.mjs';
 
 describe('normalize', () => {
   it('maps raw GitHub issue to flat shape', () => {
@@ -93,14 +93,6 @@ describe('normalize', () => {
 });
 
 describe('createFetcher', () => {
-  let createFetcher;
-
-  beforeEach(async () => {
-    // Re-import for clean state per test
-    const mod = await import('../src/tools/fetcher.mjs?' + Date.now());
-    createFetcher = mod.createFetcher;
-  });
-
   it('throws on invalid repo format — missing slash', async () => {
     const fetcher = createFetcher({ repo: 'invalidformat' });
     await assert.rejects(
@@ -131,12 +123,6 @@ describe('createFetcher', () => {
   });
 
   it('fetchIssues — fetches and normalizes issues, excluding PRs', async () => {
-    // Mock Octokit at the module level
-    const { default: Octokit } = await import('@octokit/rest');
-    const originalPaginate = Octokit.prototype.paginate;
-    const originalIssues = Octokit.prototype.rest;
-
-    // Mock paginate to return test data
     const mockIssues = [
       {
         number: 1,
@@ -173,44 +159,34 @@ describe('createFetcher', () => {
       },
     ];
 
-    Octokit.prototype.paginate = async () => mockIssues;
+    const mockClient = {
+      paginate: async () => mockIssues,
+      rest: { issues: { listForRepo: {} } },
+    };
 
-    try {
-      // Re-import to get fresh module with mock in place
-      const freshMod = await import('../src/tools/fetcher.mjs?test=' + Date.now());
-      const freshCreateFetcher = freshMod.createFetcher;
-      const fetcher = freshCreateFetcher({ repo: 'owner/repo' });
-      const results = await fetcher.fetchIssues();
+    const fetcher = createFetcher({ repo: 'owner/repo', client: mockClient });
+    const results = await fetcher.fetchIssues();
 
-      // PR should be filtered out
-      assert.equal(results.length, 2);
-      assert.equal(results[0].number, 1);
-      assert.equal(results[0].title, 'Bug report');
-      assert.equal(results[0].labels[0], 'bug');
-      assert.equal(results[0].author, 'dev1');
+    // PR should be filtered out
+    assert.equal(results.length, 2);
+    assert.equal(results[0].number, 1);
+    assert.equal(results[0].title, 'Bug report');
+    assert.equal(results[0].labels[0], 'bug');
+    assert.equal(results[0].author, 'dev1');
 
-      assert.equal(results[1].number, 3);
-      assert.equal(results[1].body, '');
-      assert.equal(results[1].author, 'unknown');
-    } finally {
-      Octokit.prototype.paginate = originalPaginate;
-    }
+    assert.equal(results[1].number, 3);
+    assert.equal(results[1].body, '');
+    assert.equal(results[1].author, 'unknown');
   });
 
   it('fetchIssues — returns empty array when no issues', async () => {
-    const { default: Octokit } = await import('@octokit/rest');
-    const originalPaginate = Octokit.prototype.paginate;
+    const mockClient = {
+      paginate: async () => [],
+      rest: { issues: { listForRepo: {} } },
+    };
 
-    Octokit.prototype.paginate = async () => [];
-
-    try {
-      const freshMod = await import('../src/tools/fetcher.mjs?test=' + Date.now());
-      const freshCreateFetcher = freshMod.createFetcher;
-      const fetcher = freshCreateFetcher({ repo: 'owner/repo' });
-      const results = await fetcher.fetchIssues();
-      assert.equal(results.length, 0);
-    } finally {
-      Octokit.prototype.paginate = originalPaginate;
-    }
+    const fetcher = createFetcher({ repo: 'owner/repo', client: mockClient });
+    const results = await fetcher.fetchIssues();
+    assert.equal(results.length, 0);
   });
 });
