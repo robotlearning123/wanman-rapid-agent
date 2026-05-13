@@ -1,0 +1,143 @@
+Script started on 2026-05-13 12:11:01-04:00 [COMMAND="bash /tmp/demo_session.sh" <not executed on terminal>]
+
+==========================================
+ wanman-rapid-agent — Demo Recording
+ Google Cloud Rapid Agent Hackathon
+==========================================
+
+$ tree -I node_modules --dirsfirst
+
+[01;34m.[0m
+├── [01;34mcoverage[0m
+│   └── [01;34mtmp[0m
+│       ├── coverage-2030407-1778669558429-0.json
+│       ├── coverage-2030419-1778669558459-0.json
+│       ├── coverage-2030420-1778669558456-0.json
+│       ├── coverage-2030421-1778669558463-0.json
+│       ├── coverage-2030422-1778669558471-0.json
+│       ├── coverage-2030438-1778669558677-0.json
+│       ├── coverage-2030439-1778669558452-0.json
+│       ├── coverage-2030450-1778669558465-0.json
+│       └── coverage-2030451-1778669558730-0.json
+├── [01;34mdocs[0m
+│   └── demo.txt
+├── [01;34mscripts[0m
+│   └── [01;32mdemo.sh[0m
+├── [01;34msrc[0m
+│   ├── [01;34magents[0m
+│   │   ├── base.mjs
+│   │   └── triage.mjs
+│   ├── [01;34mtools[0m
+│   │   ├── classifier.mjs
+│   │   ├── fetcher.mjs
+│   │   └── responder.mjs
+│   ├── [01;34mutils[0m
+│   │   └── logger.mjs
+│   └── index.mjs
+├── [01;34mtest[0m
+│   ├── agent-base.test.mjs
+│   ├── base.test.mjs
+│   ├── classifier.test.mjs
+│   ├── fetcher.test.mjs
+│   ├── index.test.mjs
+│   ├── logger.test.mjs
+│   ├── responder.test.mjs
+│   └── triage.test.mjs
+├── [01;34mtests[0m
+├── CHANGELOG.md
+├── HACKATHON.md
+├── package.json
+├── package-lock.json
+└── README.md
+
+11 directories, 31 files
+
+$ cat package.json
+
+{
+  "name": "wanman-rapid-agent",
+  "version": "0.0.1",
+  "description": "Multi-agent system for autonomous GitHub issue triage using Google Cloud Vertex AI",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node --test test/*.mjs",
+    "test:coverage": "node --test --experimental-test-coverage test/*.mjs",
+    "lint": "echo 'lint: not configured yet'"
+  },
+  "keywords": [
+    "agent",
+  ...
+
+$ npm install
+
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+$ npm test 2>&1 | tail -20
+
+  error: '2 subtests failed'
+  code: 'ERR_TEST_FAILURE'
+  ...
+# GET /repos/test/repo/issues?state=open&per_page=100 - 404 with id CA97:33DB8D:153F3EA:548332A:6A04A296 in 132ms
+# {"level":"info","ts":"2026-05-13T16:11:03.072Z","msg":"agent state transition","agent":"triage-agent","from":"running","to":"errored"}
+# {"level":"error","ts":"2026-05-13T16:11:03.072Z","msg":"agent error","agent":"triage-agent","message":"Not Found - https://docs.github.com/rest/issues/issues\#list-repository-issues","phase":"run","timestamp":"2026-05-13T16:11:03.072Z"}
+# GET /repos/test/repo/issues?state=open&per_page=100 - 404 with id E689:42F9B:153D6B6:547DEFD:6A04A297 in 676ms
+# {"level":"info","ts":"2026-05-13T16:11:03.617Z","msg":"agent state transition","agent":"triage-agent","from":"running","to":"errored"}
+# {"level":"error","ts":"2026-05-13T16:11:03.617Z","msg":"agent error","agent":"triage-agent","message":"Not Found - https://docs.github.com/rest/issues/issues\#list-repository-issues","phase":"run","timestamp":"2026-05-13T16:11:03.617Z"}
+# Error: Test "full lifecycle — initialize → run → stop" at test/triage.test.mjs:79:3 generated asynchronous activity after the test ended. This activity created the error "HttpError: Not Found - https://docs.github.com/rest/issues/issues\#list-repository-issues" and would have caused the test to fail, but instead triggered an unhandledRejection event.
+# Error: Test "logs triage activity to stderr" at test/triage.test.mjs:91:3 generated asynchronous activity after the test ended. This activity created the error "HttpError: Not Found - https://docs.github.com/rest/issues/issues\#list-repository-issues" and would have caused the test to fail, but instead triggered an unhandledRejection event.
+1..17
+# tests 106
+# suites 21
+# pass 101
+# fail 5
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1518.271594
+
+
+$ npm start  # dry-run mode
+
+{"level":"info","ts":"2026-05-13T16:11:03.656Z","msg":"wanman-rapid-agent starting","repo":"octocat/Hello-World","dryRun":true}
+{"level":"info","ts":"2026-05-13T16:11:03.656Z","msg":"agent state transition","agent":"triage-agent","from":"idle","to":"initializing"}
+{"level":"info","ts":"2026-05-13T16:11:03.657Z","msg":"triage agent initialized","repo":"octocat/Hello-World","dryRun":true}
+{"level":"info","ts":"2026-05-13T16:11:03.657Z","msg":"agent state transition","agent":"triage-agent","from":"initializing","to":"running"}
+{"level":"info","ts":"2026-05-13T16:11:03.657Z","msg":"fetching issues","repo":"octocat/Hello-World"}
+{"level":"info","ts":"2026-05-13T16:11:44.534Z","msg":"fetched issues","repo":"octocat/Hello-World","total":5837,"issues":4812}
+{"level":"info","ts":"2026-05-13T16:11:44.535Z","msg":"fetched issues for triage","count":4812}
+{"level":"info","ts":"2026-05-13T16:11:44.536Z","msg":"classifying issue","project":"demo-project","model":"gemini-1.5-flash","issue":"Test Issue 1778662068"}
+{"level":"warn","ts":"2026-05-13T16:11:44.537Z","msg":"classification failed, using defaults","error":"Cannot find package 'google-auth-library' imported from /tmp/wanman-hackathon/rapid-agent/src/tools/classifier.mjs"}
+{"level":"info","ts":"2026-05-13T16:11:44.538Z","msg":"dry-run: would apply labels","issue":9514,"labels":["priority:P3","area:other","severity:minor"]}
+{"level":"info","ts":"2026-05-13T16:11:44.538Z","msg":"dry-run: would post comment","issue":9514}
+{"level":"info","ts":"2026-05-13T16:11:44.538Z","msg":"classifying issue","project":"demo-project","model":"gemini-1.5-flash","issue":"Test Issue 1778651742"}
+{"level":"warn","ts":"2026-05-13T16:11:44.539Z","msg":"classification failed, using defaults","error":"Cannot find package 'google-auth-library' imported from /tmp/wanman-hackathon/rapid-agent/src/tools/classifier.mjs"}
+{"level":"info","ts":"2026-05-13T16:11:44.539Z","msg":"dry-run: would apply labels","issue":9513,"labels":["priority:P3","area:other","severity:minor"]}
+{"level":"info","ts":"2026-05-13T16:11:44.539Z","msg":"dry-run: would post comment","issue":9513}
+{"level":"info","ts":"2026-05-13T16:11:44.539Z","msg":"classifying issue","project":"demo-project","model":"gemini-1.5-flash","issue":"Test Issue 1778646472"}
+{"level":"warn","ts":"2026-05-13T16:11:44.540Z","msg":"classification failed, using defaults","error":"Cannot find package 'google-auth-library' imported from /tmp/wanman-hackathon/rapid-agent/src/tools/classifier.mjs"}
+{"level":"info","ts":"2026-05-13T16:11:44.540Z","msg":"dry-run: would apply labels","issue":9512,"labels":["priority:P3","area:other","severity:minor"]}
+{"level":"info","ts":"2026-05-13T16:11:44.540Z","msg":"dry-run: would post comment","issue":9512}
+{"level":"info","ts":"2026-05-13T16:11:44.540Z","msg":"classifying issue","project":"demo-project","model":"gemini-1.5-flash","issue":"🚨 New article published 😫"}
+
+
+Source walkthrough:
+  src/index.mjs        — entry point, orchestrates the triage pipeline
+  src/agents/base.mjs  — base Agent class with state machine (IDLE→INIT→RUN→STOP)
+  src/agents/triage.mjs— TriageAgent: fetches issues, classifies, responds
+  src/tools/fetcher.mjs — GitHub issue fetcher via Octokit
+  src/tools/classifier.mjs — Vertex AI classifier with Gemini model
+  src/tools/responder.mjs — Applies labels and comments to GitHub issues
+  src/utils/logger.mjs — Structured JSON logger (pino-compatible)
+
+Test suite: 8 test files, 106 tests, 101 passing
+  (5 TriageAgent tests fail due to live GitHub API — mock needed)
+
+==========================================
+ Demo complete
+==========================================
+
+Script done on 2026-05-13 12:11:44-04:00 [COMMAND_EXIT_CODE="0"]
