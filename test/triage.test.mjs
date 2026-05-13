@@ -178,4 +178,41 @@ describe('TriageAgent', () => {
 
     assert.ok(output.includes('triage agent initialized'), 'should log initialization');
   });
+
+  it('creates dry-run classifier when gcpProject is not set', async () => {
+    // Covers the gcpProject falsy branch in _onInitialize
+    const tools = {
+      fetcher: { async fetchIssues() { return []; } },
+      responder: { async applyLabels() { return []; }, async postComment() { return true; } },
+    };
+    const agent = new TriageAgent({
+      repo: 'test/repo',
+      dryRun: true,
+      _tools: tools,
+    });
+    await agent.initialize();
+    const result = await agent.run();
+    assert.equal(result.total, 0);
+  });
+
+  it('creates classifier from gcpProject when _tools.classifier not provided', async () => {
+    // Covers the _tools?.classifier undefined + gcpProject truthy branch
+    const tools = {
+      fetcher: { async fetchIssues() { return [sampleIssue]; } },
+      responder: { async applyLabels() { return ['priority:P3']; }, async postComment() { return true; } },
+    };
+    const agent = new TriageAgent({
+      repo: 'test/repo',
+      dryRun: true,
+      gcpProject: 'my-gcp-project',
+      _tools: tools,
+    });
+    await agent.initialize();
+    // The classifier is created from gcpProject but classify() will fail
+    // because google-auth-library isn't installed — it falls back to defaults
+    const result = await agent.run();
+    assert.equal(result.total, 1);
+    assert.equal(result.classified, 1);
+    assert.equal(result.errors, 0);
+  });
 });

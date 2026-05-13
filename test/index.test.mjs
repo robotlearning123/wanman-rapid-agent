@@ -4,6 +4,7 @@
 
 import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { loadConfig, main } from '../src/index.mjs';
 
 const mockTools = {
@@ -128,5 +129,24 @@ describe('main', () => {
     }
 
     assert.equal(exitCode, 1, 'should call process.exit(1)');
+  });
+
+  it('auto-run guard calls main() when executed directly', () => {
+    // Execute index.mjs as a subprocess to cover the process.argv guard
+    // The process will log "wanman-rapid-agent starting" then fail (no real token)
+    // and call process.exit(1) — but the auto-run branch is exercised
+    let stderr;
+    try {
+      stderr = execFileSync('node', ['src/index.mjs'], {
+        cwd: new URL('..', import.meta.url).pathname.replace(/\/$/, ''),
+        encoding: 'utf8',
+        timeout: 10000,
+        env: { ...process.env },
+      });
+    } catch (err) {
+      // Process exits with code 1 due to no GitHub token — expected
+      stderr = err.stderr || '';
+    }
+    assert.ok(stderr.includes('wanman-rapid-agent starting'), 'auto-run guard should call main()');
   });
 });

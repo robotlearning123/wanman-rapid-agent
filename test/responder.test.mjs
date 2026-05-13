@@ -125,4 +125,11 @@ describe('createResponder', () => {
     assert.equal(createCommentCall.args.body, 'Triage comment body');
     assert.equal(result, true);
   });
+
+  it('constructs Octokit from token when client not provided (dry-run)', async () => {
+    // Covers the `token ? new Octokit({ auth: token }) : null` branch
+    const r = createResponder({ repo: 'owner/repo', dryRun: true, token: 'ghp_test123' });
+    const labels = await r.applyLabels(1, { priority: 'P2', area: 'docs', severity: 'minor' });
+    assert.deepEqual(labels, ['priority:P2', 'area:docs', 'severity:minor']);
+  });
 });

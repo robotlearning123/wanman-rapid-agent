@@ -231,6 +231,21 @@ describe('callVertexAI', () => {
       { message: /Empty response from Vertex AI/ },
     );
   });
+
+  it('attempts google-auth-library import when getAccessToken not provided', async () => {
+    // Without getAccessToken, callVertexAI tries to import google-auth-library
+    // which is not installed, so it throws a module-not-found error
+    await assert.rejects(
+      () => callVertexAI({
+        project: 'test-proj',
+        location: 'us-central1',
+        model: 'gemini-1.5-flash',
+        prompt: 'test',
+        fetchImpl: async () => ({ ok: true, json: async () => ({ candidates: [{ content: { parts: [{ text: '{}' }] } }] }) }),
+      }),
+      { code: 'ERR_MODULE_NOT_FOUND' },
+    );
+  });
 });
 
 describe('classify method (no callAI injection)', () => {
