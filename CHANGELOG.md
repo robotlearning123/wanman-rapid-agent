@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-05-13
+
+### Added
+
+- `withRetry()` utility (`src/utils/retry.mjs`) — exponential backoff for transient API failures
+- Retry support in `FetcherTool` — transient GitHub API errors are retried up to 3 times
+- Retry support in `ClassifierTool` — transient Vertex AI errors are retried up to 3 times
+- `createRunStorage()` (`src/tools/storage.mjs`) — optional Google Cloud Storage run-report persistence
+- GCS run reports: configure `GCS_BUCKET` and `GCS_PREFIX` to write JSON triage reports to Cloud Storage
+- `@google-cloud/storage` and `google-auth-library` dependencies for GCS integration
+- Test coverage expanded to 133 tests (all passing)
+
+### Project Stats
+
+| Metric | Value |
+|--------|-------|
+| Source files | 9 |
+| Test files | 9 |
+| Tests | 133 (all passing) |
+| Dependencies | 3 (`@octokit/rest`, `@google-cloud/storage`, `google-auth-library`) |
+| Dev dependencies | 1 (`c8`) |
+| CI | GitHub Actions (Node 18, 20) |
+| Line coverage | 99.64% |
+| Branch coverage | 96.96% |
+
 ## [0.1.0] - 2026-05-13
 
 ### Added
@@ -35,4 +60,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Dev dependencies | 1 (`c8`) |
 | CI | GitHub Actions (Node 18, 20) |
 
-[0.1.0]: https://github.com/your-org/wanman-rapid-agent/releases/tag/v0.1.0
+[0.2.0]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.2.0
+[0.1.0]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.0
