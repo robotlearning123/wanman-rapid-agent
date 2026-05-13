@@ -2,7 +2,7 @@
  * Tests for src/agents/base.mjs — Agent base class
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { Agent, AgentState } from '../src/agents/base.mjs';
 

@@ -2,7 +2,7 @@
  * Tests for src/utils/logger.mjs
  */
 
-import { describe, it, beforeEach, afterEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { logger } from '../src/utils/logger.mjs';
 
