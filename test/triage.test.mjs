@@ -7,12 +7,16 @@ import assert from 'node:assert/strict';
 import { TriageAgent } from '../src/agents/triage.mjs';
 import { AgentState } from '../src/agents/base.mjs';
 
-function captureStderr(fn) {
+async function captureStderr(fn) {
   const chunks = [];
   const original = process.stderr.write.bind(process.stderr);
-  process.stderr.write = (chunk) => chunks.push(chunk);
+  process.stderr.write = (chunk, encoding, cb) => {
+    chunks.push(chunk);
+    if (typeof cb === 'function') cb();
+    return true;
+  };
   try {
-    fn();
+    await fn();
   } finally {
     process.stderr.write = original;
   }
@@ -159,7 +163,7 @@ describe('TriageAgent', () => {
   });
 
   it('full lifecycle — initialize → run', async () => {
-    const output = captureStderr(async () => {
+    const output = await captureStderr(async () => {
       const agent = new TriageAgent(baseConfig);
       await agent.initialize();
       const result = await agent.run();
@@ -170,7 +174,7 @@ describe('TriageAgent', () => {
   });
 
   it('logs triage activity to stderr', async () => {
-    const output = captureStderr(async () => {
+    const output = await captureStderr(async () => {
       const agent = new TriageAgent(baseConfig);
       await agent.initialize();
       await agent.run();
