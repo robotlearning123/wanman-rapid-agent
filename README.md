@@ -35,6 +35,7 @@ wanman-rapid-agent connects to a GitHub repository, fetches open issues, classif
 src/
   index.mjs            Entry point — CLI bootstrap
   agents/
+    base.mjs           AgentBase — abstract state machine, events, error handling
     triage.mjs         TriageAgent — main orchestration loop
   tools/
     fetcher.mjs        GitHub issue fetcher (Octokit)
