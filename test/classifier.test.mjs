@@ -63,7 +63,7 @@ describe('parseResponse', () => {
   it('parses clean JSON', () => {
     const raw = '{"priority":"P1","area":"bug","severity":"major","summary":"test summary"}';
     const result = parseResponse(raw);
-    assert.equal(result.priority, 'p1');
+    assert.equal(result.priority, 'P1');
     assert.equal(result.area, 'bug');
     assert.equal(result.severity, 'major');
     assert.equal(result.summary, 'test summary');
@@ -72,21 +72,21 @@ describe('parseResponse', () => {
   it('handles markdown code fences', () => {
     const raw = '```json\n{"priority":"P2","area":"feature","severity":"minor","summary":"desc"}\n```';
     const result = parseResponse(raw);
-    assert.equal(result.priority, 'p2');
+    assert.equal(result.priority, 'P2');
     assert.equal(result.area, 'feature');
   });
 
   it('handles code fences without json tag', () => {
     const raw = '```\n{"priority":"P3","area":"docs","severity":"minor","summary":"ok"}\n```';
     const result = parseResponse(raw);
-    assert.equal(result.priority, 'p3');
+    assert.equal(result.priority, 'P3');
     assert.equal(result.area, 'docs');
   });
 
   it('falls back to P3 for invalid priority', () => {
     const raw = '{"priority":"invalid","area":"bug","severity":"major","summary":"x"}';
     const result = parseResponse(raw);
-    assert.equal(result.priority, 'p3'); // fallback
+    assert.equal(result.priority, 'P3'); // fallback
   });
 
   it('falls back to "other" for invalid area', () => {
