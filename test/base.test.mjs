@@ -118,13 +118,14 @@ describe('Agent base class', () => {
   });
 
   describe('error handling', () => {
-    it('fail records error and transitions to ERRORED', () => {
+    it('fail records error and transitions to ERRORED from RUNNING', async () => {
       const agent = new Agent('fail-test');
-      agent.fail(new Error('test error'), 'initialize');
+      await agent.initialize(); // IDLE → RUNNING
+      agent.fail(new Error('test error'), 'run');
       assert.equal(agent.state, AgentState.ERRORED);
       assert.equal(agent.errors.length, 1);
       assert.equal(agent.errors[0].message, 'test error');
-      assert.equal(agent.errors[0].phase, 'initialize');
+      assert.equal(agent.errors[0].phase, 'run');
     });
 
     it('errors array is a frozen copy', () => {
