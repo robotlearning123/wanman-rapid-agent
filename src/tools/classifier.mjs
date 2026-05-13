@@ -109,11 +109,8 @@ export function parseResponse(raw) {
  */
 function validateEnum(value, enumObj, fallback) {
   const values = Object.values(enumObj);
-  if (typeof value === 'string' && values.includes(value.toLowerCase())) {
-    return value.toLowerCase();
-  }
-  // Try case-insensitive match
-  const match = values.find((v) => v.toLowerCase() === String(value).toLowerCase());
+  const lower = String(value).toLowerCase();
+  const match = values.find((v) => v.toLowerCase() === lower);
   return match ?? fallback;
 }
 
