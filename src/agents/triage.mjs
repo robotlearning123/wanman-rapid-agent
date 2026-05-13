@@ -9,6 +9,7 @@ import { Agent, AgentState } from './base.mjs';
 import { createFetcher } from '../tools/fetcher.mjs';
 import { createClassifier } from '../tools/classifier.mjs';
 import { createResponder, buildComment } from '../tools/responder.mjs';
+import { createRunStorage } from '../tools/storage.mjs';
 import { logger } from '../utils/logger.mjs';
 
 /**
@@ -23,6 +24,7 @@ import { logger } from '../utils/logger.mjs';
  * @property {number} commented - comments posted
  * @property {number} errors - errors encountered
  * @property {object[]} [details] - per-issue classification details
+ * @property {object} [storage] - Cloud Storage persistence result
  */
 
 export class TriageAgent extends Agent {
@@ -35,6 +37,9 @@ export class TriageAgent extends Agent {
   /** @type {ReturnType<typeof createResponder>|null} */
   #responder = null;
 
+  /** @type {ReturnType<typeof createRunStorage>|null} */
+  #storage = null;
+
   /**
    * @param {{
    *   repo: string,
@@ -42,6 +47,8 @@ export class TriageAgent extends Agent {
    *   gcpProject?: string,
    *   gcpLocation?: string,
    *   gcpModel?: string,
+   *   gcsBucket?: string,
+   *   gcsPrefix?: string,
    *   dryRun?: boolean,
    * }} config
    */
@@ -54,7 +61,7 @@ export class TriageAgent extends Agent {
    * @protected
    */
   async _onInitialize() {
-    const { repo, token, gcpProject, gcpLocation, gcpModel, dryRun, _tools } = this.config;
+    const { repo, token, gcpProject, gcpLocation, gcpModel, gcsBucket, gcsPrefix, dryRun, _tools } = this.config;
 
     this.#fetcher = _tools?.fetcher ?? createFetcher({ token, repo });
 
@@ -63,6 +70,7 @@ export class TriageAgent extends Agent {
       : createClassifier({ project: 'dry-run' }));
 
     this.#responder = _tools?.responder ?? createResponder({ token, repo, dryRun: dryRun ?? true });
+    this.#storage = _tools?.storage ?? createRunStorage({ bucketName: gcsBucket, prefix: gcsPrefix });
 
     logger.info('triage agent initialized', { repo, dryRun });
   }
@@ -79,12 +87,12 @@ export class TriageAgent extends Agent {
       issues = await this.#fetcher.fetchIssues();
     } catch (err) {
       logger.error('fetch failed', { error: err.message });
-      return { total: 0, classified: 0, labeled: 0, commented: 0, errors: 1 };
+      return this.#finalizeRun({ total: 0, classified: 0, labeled: 0, commented: 0, errors: 1 });
     }
     logger.info('fetched issues for triage', { count: issues.length });
 
     if (issues.length === 0) {
-      return { total: 0, classified: 0, labeled: 0, commented: 0, errors: 0 };
+      return this.#finalizeRun({ total: 0, classified: 0, labeled: 0, commented: 0, errors: 0 });
     }
 
     const details = [];
@@ -115,14 +123,14 @@ export class TriageAgent extends Agent {
       errors,
     });
 
-    return {
+    return this.#finalizeRun({
       total: issues.length,
       classified,
       labeled,
       commented,
       errors,
       details,
-    };
+    });
   }
 
   /**
@@ -150,6 +158,29 @@ export class TriageAgent extends Agent {
   }
 
   /**
+   * Persist a run report when Cloud Storage is configured.
+   *
+   * @param {TriageResult} result
+   * @returns {Promise<TriageResult>}
+   */
+  async #finalizeRun(result) {
+    try {
+      const storage = await this.#storage.saveRunReport({
+        repo: this.config.repo,
+        dryRun: this.config.dryRun ?? true,
+        result,
+      });
+      return { ...result, storage };
+    } catch (err) {
+      logger.warn('cloud storage report failed', { error: err.message });
+      return {
+        ...result,
+        storage: { saved: false, error: err.message },
+      };
+    }
+  }
+
+  /**
    * Clean up resources. Called by Agent.stop().
    * @protected
    */
@@ -157,6 +188,7 @@ export class TriageAgent extends Agent {
     this.#fetcher = null;
     this.#classifier = null;
     this.#responder = null;
+    this.#storage = null;
     logger.info('triage agent stopped');
   }
 }

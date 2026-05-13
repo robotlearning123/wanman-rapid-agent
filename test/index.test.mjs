@@ -39,6 +39,8 @@ describe('loadConfig', () => {
     delete process.env.GOOGLE_CLOUD_PROJECT;
     delete process.env.GOOGLE_CLOUD_LOCATION;
     delete process.env.VERTEX_MODEL;
+    delete process.env.GCS_BUCKET;
+    delete process.env.GCS_PREFIX;
     delete process.env.DRY_RUN;
 
     const config = loadConfig();
@@ -47,6 +49,8 @@ describe('loadConfig', () => {
     assert.equal(config.gcpProject, '');
     assert.equal(config.gcpLocation, 'us-central1');
     assert.equal(config.gcpModel, 'gemini-1.5-flash');
+    assert.equal(config.gcsBucket, '');
+    assert.equal(config.gcsPrefix, 'triage-runs');
     assert.equal(config.dryRun, true);
   });
 
@@ -56,6 +60,8 @@ describe('loadConfig', () => {
     process.env.GOOGLE_CLOUD_PROJECT = 'my-gcp-project';
     process.env.GOOGLE_CLOUD_LOCATION = 'europe-west1';
     process.env.VERTEX_MODEL = 'gemini-1.5-pro';
+    process.env.GCS_BUCKET = 'triage-reports';
+    process.env.GCS_PREFIX = 'runs';
     process.env.DRY_RUN = 'false';
 
     const config = loadConfig();
@@ -64,6 +70,8 @@ describe('loadConfig', () => {
     assert.equal(config.gcpProject, 'my-gcp-project');
     assert.equal(config.gcpLocation, 'europe-west1');
     assert.equal(config.gcpModel, 'gemini-1.5-pro');
+    assert.equal(config.gcsBucket, 'triage-reports');
+    assert.equal(config.gcsPrefix, 'runs');
     assert.equal(config.dryRun, false);
   });
 
@@ -166,7 +174,7 @@ describe('main', () => {
       cwd: projectRoot,
       encoding: 'utf8',
       timeout: 10000,
-      env: { ...process.env, DRY_RUN: 'true' },
+      env: { ...process.env, DRY_RUN: 'true', GITHUB_REPOSITORY: 'invalid-format' },
     });
 
     const stderr = result.stderr || '';

@@ -189,4 +189,41 @@ describe('createFetcher', () => {
     const results = await fetcher.fetchIssues();
     assert.equal(results.length, 0);
   });
+
+  it('fetchIssues — retries transient GitHub API failures with backoff', async () => {
+    const delays = [];
+    let calls = 0;
+    const mockClient = {
+      paginate: async () => {
+        calls++;
+        if (calls < 3) throw new Error('temporary GitHub API error');
+        return [{
+          number: 7,
+          title: 'Intermittent bug',
+          body: 'Sometimes fails',
+          labels: [],
+          html_url: 'https://github.com/owner/repo/issues/7',
+          created_at: '2025-01-01T00:00:00Z',
+          updated_at: '2025-01-01T00:00:00Z',
+          user: { login: 'dev7' },
+          pull_request: undefined,
+        }];
+      },
+      rest: { issues: { listForRepo: {} } },
+    };
+
+    const fetcher = createFetcher({
+      repo: 'owner/repo',
+      client: mockClient,
+      retryDelaysMs: [1000, 2000, 4000],
+      retrySleep: async (ms) => { delays.push(ms); },
+    });
+
+    const results = await fetcher.fetchIssues();
+
+    assert.equal(calls, 3);
+    assert.deepEqual(delays, [1000, 2000]);
+    assert.equal(results.length, 1);
+    assert.equal(results[0].number, 7);
+  });
 });

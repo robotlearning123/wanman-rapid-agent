@@ -6,14 +6,15 @@
 
 import { Octokit } from '@octokit/rest';
 import { logger } from '../utils/logger.mjs';
+import { withRetry, DEFAULT_RETRY_DELAYS_MS } from '../utils/retry.mjs';
 
 /**
  * Create a fetcher bound to a specific repository.
  *
- * @param {{ token?: string, repo: string }} opts
+ * @param {{ token?: string, repo: string, retryDelaysMs?: number[], retrySleep?: function }} opts
  * @returns {{ fetchIssues(): Promise<NormalizedIssue[]> }}
  */
-export function createFetcher({ token, repo, client }) {
+export function createFetcher({ token, repo, client, retryDelaysMs = DEFAULT_RETRY_DELAYS_MS, retrySleep }) {
   const octokit = client ?? new Octokit({ auth: token });
 
   return {
@@ -31,12 +32,26 @@ export function createFetcher({ token, repo, client }) {
 
       logger.info('fetching issues', { repo });
 
-      const issues = await octokit.paginate(octokit.rest.issues.listForRepo, {
-        owner,
-        repo: repository,
-        state: 'open',
-        per_page: 100,
-      });
+      const issues = await withRetry(
+        () => octokit.paginate(octokit.rest.issues.listForRepo, {
+          owner,
+          repo: repository,
+          state: 'open',
+          per_page: 100,
+        }),
+        {
+          delaysMs: retryDelaysMs,
+          sleepFn: retrySleep,
+          onRetry: ({ attempt, nextAttempt, delayMs, error }) => {
+            logger.warn('fetch issues retry scheduled', {
+              attempt,
+              nextAttempt,
+              delayMs,
+              error: error.message,
+            });
+          },
+        },
+      );
 
       // Filter out pull requests (GitHub API returns PRs as issues)
       const openIssues = issues.filter(

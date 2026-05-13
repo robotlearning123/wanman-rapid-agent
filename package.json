@@ -23,7 +23,9 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@octokit/rest": "^21.0.0"
+    "@google-cloud/storage": "^7.19.0",
+    "@octokit/rest": "^21.0.0",
+    "google-auth-library": "^10.6.2"
   },
   "devDependencies": {
     "c8": "^10.1.3"
