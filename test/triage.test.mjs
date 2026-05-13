@@ -113,7 +113,7 @@ describe('TriageAgent', () => {
       fetcher: { async fetchIssues() { return [sampleIssue]; } },
       classifier: { async classify() { return classifyResult; } },
       responder: {
-        async applyLabels(n, cls) { const l = ['priority:P1']; appliedLabels.push({ n, l }); return l; },
+        async applyLabels(n, _cls) { const l = ['priority:P1']; appliedLabels.push({ n, l }); return l; },
         async postComment() { return true; },
       },
     };

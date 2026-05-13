@@ -8,7 +8,8 @@
     "start": "node src/index.mjs",
     "test": "node --test test/*.mjs",
     "test:coverage": "node --test --experimental-test-coverage test/*.mjs",
-    "lint": "echo 'lint: not configured yet'"
+    "lint": "eslint src/ test/",
+    "lint:fix": "eslint --fix src/ test/"
   },
   "keywords": [
     "agent",

@@ -5,7 +5,7 @@
  * Extends the Agent base class for lifecycle management and state tracking.
  */
 
-import { Agent, AgentState } from './base.mjs';
+import { Agent } from './base.mjs';
 import { createFetcher } from '../tools/fetcher.mjs';
 import { createClassifier } from '../tools/classifier.mjs';
 import { createResponder, buildComment } from '../tools/responder.mjs';
