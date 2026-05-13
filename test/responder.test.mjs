@@ -44,7 +44,7 @@ describe('createResponder', () => {
   it('throws on invalid repo format', () => {
     assert.throws(
       () => createResponder({ repo: 'invalid', dryRun: true }),
-      { message: /Invalid repository format/ }
+      { message: /Invalid repository format/ },
     );
   });
 
@@ -76,5 +76,60 @@ describe('createResponder', () => {
     const r = createResponder({ repo: 'owner/repo', dryRun: false });
     const result = await r.postComment(42, 'test comment');
     assert.equal(result, false);
+  });
+
+  it('applyLabels — live mode with mock client applies labels via API', async () => {
+    const addLabelsCall = { called: false, args: null };
+    const mockClient = {
+      rest: {
+        issues: {
+          addLabels: async (args) => {
+            addLabelsCall.called = true;
+            addLabelsCall.args = args;
+          },
+        },
+      },
+    };
+
+    const r = createResponder({ repo: 'owner/repo', dryRun: false, client: mockClient });
+    const labels = await r.applyLabels(42, { priority: 'P1', area: 'bug', severity: 'critical' });
+
+    assert.equal(addLabelsCall.called, true);
+    assert.equal(addLabelsCall.args.owner, 'owner');
+    assert.equal(addLabelsCall.args.repo, 'repo');
+    assert.equal(addLabelsCall.args.issue_number, 42);
+    assert.deepEqual(addLabelsCall.args.labels, ['priority:P1', 'area:bug', 'severity:critical']);
+    assert.deepEqual(labels, ['priority:P1', 'area:bug', 'severity:critical']);
+  });
+
+  it('postComment — live mode with mock client posts comment via API', async () => {
+    const createCommentCall = { called: false, args: null };
+    const mockClient = {
+      rest: {
+        issues: {
+          createComment: async (args) => {
+            createCommentCall.called = true;
+            createCommentCall.args = args;
+          },
+        },
+      },
+    };
+
+    const r = createResponder({ repo: 'owner/repo', dryRun: false, client: mockClient });
+    const result = await r.postComment(42, 'Triage comment body');
+
+    assert.equal(createCommentCall.called, true);
+    assert.equal(createCommentCall.args.owner, 'owner');
+    assert.equal(createCommentCall.args.repo, 'repo');
+    assert.equal(createCommentCall.args.issue_number, 42);
+    assert.equal(createCommentCall.args.body, 'Triage comment body');
+    assert.equal(result, true);
+  });
+
+  it('constructs Octokit from token when client not provided (dry-run)', async () => {
+    // Covers the `token ? new Octokit({ auth: token }) : null` branch
+    const r = createResponder({ repo: 'owner/repo', dryRun: true, token: 'ghp_test123' });
+    const labels = await r.applyLabels(1, { priority: 'P2', area: 'docs', severity: 'minor' });
+    assert.deepEqual(labels, ['priority:P2', 'area:docs', 'severity:minor']);
   });
 });

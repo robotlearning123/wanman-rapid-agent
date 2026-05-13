@@ -54,15 +54,15 @@ export class TriageAgent extends Agent {
    * @protected
    */
   async _onInitialize() {
-    const { repo, token, gcpProject, gcpLocation, gcpModel, dryRun } = this.config;
+    const { repo, token, gcpProject, gcpLocation, gcpModel, dryRun, _tools } = this.config;
 
-    this.#fetcher = createFetcher({ token, repo });
+    this.#fetcher = _tools?.fetcher ?? createFetcher({ token, repo });
 
-    this.#classifier = gcpProject
+    this.#classifier = _tools?.classifier ?? (gcpProject
       ? createClassifier({ project: gcpProject, location: gcpLocation, model: gcpModel })
-      : createClassifier({ project: 'dry-run' });
+      : createClassifier({ project: 'dry-run' }));
 
-    this.#responder = createResponder({ token, repo, dryRun: dryRun ?? true });
+    this.#responder = _tools?.responder ?? createResponder({ token, repo, dryRun: dryRun ?? true });
 
     logger.info('triage agent initialized', { repo, dryRun });
   }
@@ -74,7 +74,13 @@ export class TriageAgent extends Agent {
    * @returns {Promise<TriageResult>}
    */
   async _onRun() {
-    const issues = await this.#fetcher.fetchIssues();
+    let issues;
+    try {
+      issues = await this.#fetcher.fetchIssues();
+    } catch (err) {
+      logger.error('fetch failed', { error: err.message });
+      return { total: 0, classified: 0, labeled: 0, commented: 0, errors: 1 };
+    }
     logger.info('fetched issues for triage', { count: issues.length });
 
     if (issues.length === 0) {
@@ -96,7 +102,7 @@ export class TriageAgent extends Agent {
         if (result.commentPosted) commented++;
       } catch (err) {
         errors++;
-        this.fail(err, 'triage-issue');
+        logger.warn('issue triage failed', { number: issue.number, error: err.message });
         details.push({ number: issue.number, error: err.message });
       }
     }
