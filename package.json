@@ -1,1 +1,24 @@
-{"name": "wanman-rapid-agent", "version": "0.0.1", "scripts": {"test": "echo no tests yet"}}
+{
+  "name": "wanman-rapid-agent",
+  "version": "0.0.1",
+  "description": "Multi-agent system for autonomous GitHub issue triage using Google Cloud Vertex AI",
+  "type": "module",
+  "main": "src/index.mjs",
+  "scripts": {
+    "start": "node src/index.mjs",
+    "test": "node --test test/*.mjs",
+    "test:coverage": "node --test --experimental-test-coverage test/*.mjs",
+    "lint": "echo 'lint: not configured yet'"
+  },
+  "keywords": ["agent", "github", "triage", "google-cloud", "vertex-ai", "wanman"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@octokit/rest": "^21.0.0"
+  },
+  "devDependencies": {
+    "c8": "^10.0.0"
+  }
+}
