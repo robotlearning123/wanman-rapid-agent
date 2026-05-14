@@ -54,7 +54,6 @@ export function sanitizeCommentField(str) {
   // Strip HTML tags
   let clean = str.replace(/<[^>]*>/g, '');
   // Strip control characters
-  // eslint-disable-next-line no-control-regex
   clean = clean.replace(/[\x00-\x08\x0B\x0E-\x1F\x7F-\x9F]/g, '');
   return clean;
 }
