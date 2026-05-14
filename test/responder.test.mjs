@@ -4,7 +4,33 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { classificationToLabels, buildComment, createResponder } from '../src/tools/responder.mjs';
+import { classificationToLabels, buildComment, createResponder, hasPriorityLabel } from '../src/tools/responder.mjs';
+
+describe('hasPriorityLabel', () => {
+  it('returns true for priority:P1', () => {
+    assert.equal(hasPriorityLabel(['bug', 'priority:P1']), true);
+  });
+
+  it('returns true for priority:P3 (case-insensitive)', () => {
+    assert.equal(hasPriorityLabel(['priority:p3']), true);
+  });
+
+  it('returns false when no priority label exists', () => {
+    assert.equal(hasPriorityLabel(['bug', 'area:core']), false);
+  });
+
+  it('returns false for empty labels', () => {
+    assert.equal(hasPriorityLabel([]), false);
+  });
+
+  it('returns false for partial match like priority:critical', () => {
+    assert.equal(hasPriorityLabel(['priority:critical']), false);
+  });
+
+  it('returns true for priority:P0', () => {
+    assert.equal(hasPriorityLabel(['priority:P0']), true);
+  });
+});
 
 describe('classificationToLabels', () => {
   it('maps all three classification fields to labels', () => {
