@@ -226,9 +226,20 @@ describe('validateConfig', () => {
     assert.equal(result, config);
   });
 
+  it('permits dry-run mode without live credentials', () => {
+    delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    const config = {
+      token: '',
+      gcpProject: '',
+      dryRun: true,
+    };
+    const result = validateConfig(config);
+    assert.equal(result, config);
+  });
+
   it('throws listing all missing required vars', () => {
     delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
-    const config = { token: '', gcpProject: '' };
+    const config = { token: '', gcpProject: '', dryRun: false };
     assert.throws(
       () => validateConfig(config),
       (err) => err.message.includes('GITHUB_TOKEN')
@@ -239,7 +250,7 @@ describe('validateConfig', () => {
 
   it('throws for missing GITHUB_TOKEN only', () => {
     process.env.GOOGLE_APPLICATION_CREDENTIALS = '/tmp/test-key.json';
-    const config = { token: '', gcpProject: 'test-project' };
+    const config = { token: '', gcpProject: 'test-project', dryRun: false };
     assert.throws(
       () => validateConfig(config),
       (err) => err.message.includes('GITHUB_TOKEN')

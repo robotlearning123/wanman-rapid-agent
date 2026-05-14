@@ -43,6 +43,11 @@ export function loadConfig() {
  */
 export function validateConfig(config) {
   const missing = [];
+  const liveMode = config.dryRun === false;
+
+  if (!liveMode) {
+    return config;
+  }
 
   if (!config.token) missing.push('GITHUB_TOKEN');
   if (!config.gcpProject) missing.push('GOOGLE_CLOUD_PROJECT');
