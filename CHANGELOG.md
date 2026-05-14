@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-05-14
+
+### Added
+
+- GitHub webhook handler (`src/webhook.mjs`) for real-time issue triage on `issues.opened` and `issues.edited` events
+- `verifySignature()` — HMAC-SHA256 signature validation with constant-time comparison to prevent timing attacks
+- `shouldProcess()` — event/action filtering to triage only relevant issue events
+- `extractIssue()` — webhook payload normalization into the existing `NormalizedIssue` format
+- `createWebhookHandler()` — composable HTTP handler for integration into any Node.js HTTP server
+- `startWebhookServer()` — standalone webhook server (default port 3000)
+- `WEBHOOK_SECRET` environment variable for GitHub webhook secret configuration
+- CI hardening: lint gate added to GitHub Actions workflow
+- CI: Node.js 22 added to test matrix (now testing on 18, 20, 22)
+- 23 new webhook tests covering signature validation, event filtering, issue extraction, and HTTP response paths
+
+### Project Stats
+
+| Metric | Value |
+|--------|-------|
+| Source files | 10 |
+| Test files | 13 |
+| Tests | 257 (all passing) |
+| Dependencies | 3 (`@octokit/rest`, `@google-cloud/storage`, `google-auth-library`) |
+| Dev dependencies | 3 (`c8`, `eslint`, `eslint-plugin-n`) |
+| CI | GitHub Actions (Node 18, 20, 22), lint + test gates |
+
 ## [0.1.3] - 2026-05-14
 
 ### Added
@@ -114,6 +140,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Dev dependencies | 1 (`c8`) |
 | CI | GitHub Actions (Node 18, 20) |
 
+[0.1.4]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.4
 [0.1.3]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.3
 [0.1.2]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.2
 [0.1.1]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.1
