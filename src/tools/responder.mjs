@@ -44,6 +44,22 @@ export function classificationToLabels(classification) {
 }
 
 /**
+ * Sanitize a string for safe embedding in markdown/HTML context.
+ * Strips HTML tags and control characters.
+ *
+ * @param {string} str
+ * @returns {string}
+ */
+export function sanitizeCommentField(str) {
+  // Strip HTML tags
+  let clean = str.replace(/<[^>]*>/g, '');
+  // Strip control characters
+  // eslint-disable-next-line no-control-regex
+  clean = clean.replace(/[\x00-\x08\x0B\x0E-\x1F\x7F-\x9F]/g, '');
+  return clean;
+}
+
+/**
  * Build the triage summary comment body.
  *
  * @param {{ priority: string, area: string, severity: string, summary: string }} classification
@@ -58,11 +74,11 @@ export function buildComment(classification, { repo } = {}) {
     '',
     `| Field | Value |`,
     `|-------|-------|`,
-    `| **Priority** | ${classification.priority} |`,
-    `| **Area** | ${classification.area} |`,
-    `| **Severity** | ${classification.severity} |`,
+    `| **Priority** | ${sanitizeCommentField(classification.priority)} |`,
+    `| **Area** | ${sanitizeCommentField(classification.area)} |`,
+    `| **Severity** | ${sanitizeCommentField(classification.severity)} |`,
     '',
-    `> ${classification.summary}`,
+    `> ${sanitizeCommentField(classification.summary)}`,
     '',
     `_Automated by [wanman-rapid-agent](${agentUrl}) — classify issues with Vertex AI_`,
   ].join('\n');
