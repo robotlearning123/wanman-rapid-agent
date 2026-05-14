@@ -37,7 +37,7 @@ function makeTools({ issues = [], delayMs = 0, failOn = null } = {}) {
         },
       },
       responder: {
-        async applyLabels(n) { return [`priority:P2`]; },
+        async applyLabels(_n) { return [`priority:P2`]; },
         async postComment() { return true; },
       },
     },
