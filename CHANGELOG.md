@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-05-14
+
+### Added
+
+- Idempotent triage — `skipLabeled` config (default: true) skips issues that already have a `priority:P*` label
+- `hasPriorityLabel()` helper in responder for detecting existing priority labels
+- `validateConfig()` — startup validation for `GITHUB_TOKEN`, `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_APPLICATION_CREDENTIALS`; collects all missing vars before throwing for a clear single error message
+- Concurrent issue classification with configurable concurrency (`CONCURRENCY` env var, default 3, max 20); zero-dependency worker pool with per-issue error isolation
+- 31 new tests across triage, config validation, and responder modules (175 total)
+
+### Fixed
+
+- Comment template in `buildComment()` now uses actual repo URL via `GITHUB_REPOSITORY` env var instead of hardcoded `your-org` placeholder
+- `buildComment()` accepts optional `{ repo }` parameter for dynamic link generation
+
+### Project Stats
+
+| Metric | Value |
+|--------|-------|
+| Source files | 9 |
+| Test files | 11 |
+| Tests | 175 (all passing) |
+| Dependencies | 3 (`@octokit/rest`, `@google-cloud/storage`, `google-auth-library`) |
+| Dev dependencies | 3 (`c8`, `eslint`, `eslint-plugin-n`) |
+| CI | GitHub Actions (Node 18, 20), plus local lint gate |
+
 ## [0.1.1] - 2026-05-13
 
 ### Added
@@ -64,5 +90,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Dev dependencies | 1 (`c8`) |
 | CI | GitHub Actions (Node 18, 20) |
 
+[0.1.2]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.2
 [0.1.1]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.1
 [0.1.0]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.0
