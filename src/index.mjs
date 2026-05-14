@@ -61,26 +61,77 @@ export function validateConfig(config) {
 }
 
 /**
+ * Parse a comma-separated repo string into an array of owner/repo strings.
+ * Trims whitespace and filters out empty segments.
+ *
+ * @param {string} repoStr - comma-separated repos (e.g. "org/repo1,org/repo2")
+ * @returns {string[]}
+ */
+export function parseRepos(repoStr) {
+  return repoStr
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
+/**
  * Main orchestrator — creates, initializes, runs, and reports the TriageAgent.
  *
+ * Supports multi-repo mode when GITHUB_REPOSITORY contains commas:
+ *   - Splits repos and runs TriageAgent for each sequentially
+ *   - Aggregates results into a combined summary
+ *
  * @param {object} [configOverride] - override config (useful for testing)
- * @returns {Promise<object>} triage results
+ * @returns {Promise<object>} triage results (combined when multi-repo)
  */
 export async function main(configOverride) {
   const config = configOverride ?? loadConfig();
   validateConfig(config);
 
+  const repos = parseRepos(config.repo);
+
   logger.info('wanman-rapid-agent starting', {
-    repo: config.repo,
+    repos,
+    repoCount: repos.length,
     dryRun: config.dryRun,
   });
 
-  const agent = new TriageAgent(config);
-
   try {
-    await agent.initialize();
-    const results = await agent.run();
+    const allResults = [];
 
+    for (const repo of repos) {
+      const repoConfig = { ...config, repo };
+      const agent = new TriageAgent(repoConfig);
+      await agent.initialize();
+      const results = await agent.run();
+      allResults.push({ repo, ...results });
+    }
+
+    // Aggregate if multiple repos
+    if (repos.length > 1) {
+      const combined = {
+        repos: repos,
+        repoCount: repos.length,
+        total: allResults.reduce((sum, r) => sum + r.total, 0),
+        skipped: allResults.reduce((sum, r) => sum + (r.skipped ?? 0), 0),
+        classified: allResults.reduce((sum, r) => sum + r.classified, 0),
+        labeled: allResults.reduce((sum, r) => sum + r.labeled, 0),
+        commented: allResults.reduce((sum, r) => sum + r.commented, 0),
+        errors: allResults.reduce((sum, r) => sum + r.errors, 0),
+        perRepo: allResults,
+      };
+
+      logger.info('multi-repo orchestration complete', {
+        repoCount: combined.repoCount,
+        total: combined.total,
+        classified: combined.classified,
+        errors: combined.errors,
+      });
+
+      return combined;
+    }
+
+    const results = allResults[0];
     logger.info('orchestration complete', {
       total: results.total,
       classified: results.classified,
