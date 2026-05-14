@@ -8,7 +8,7 @@
 import { Agent } from './base.mjs';
 import { createFetcher } from '../tools/fetcher.mjs';
 import { createClassifier } from '../tools/classifier.mjs';
-import { createResponder, buildComment } from '../tools/responder.mjs';
+import { createResponder, buildComment, hasPriorityLabel } from '../tools/responder.mjs';
 import { createRunStorage } from '../tools/storage.mjs';
 import { logger } from '../utils/logger.mjs';
 
@@ -19,6 +19,7 @@ import { logger } from '../utils/logger.mjs';
 /**
  * @typedef {object} TriageResult
  * @property {number} total - total issues processed
+ * @property {number} skipped - issues skipped (already labeled)
  * @property {number} classified - successfully classified
  * @property {number} labeled - labels applied
  * @property {number} commented - comments posted
@@ -50,6 +51,7 @@ export class TriageAgent extends Agent {
    *   gcsBucket?: string,
    *   gcsPrefix?: string,
    *   dryRun?: boolean,
+   *   skipLabeled?: boolean,
    * }} config
    */
   constructor(config) {
@@ -82,26 +84,36 @@ export class TriageAgent extends Agent {
    * @returns {Promise<TriageResult>}
    */
   async _onRun() {
+    const skipLabeled = this.config.skipLabeled ?? true;
+
     let issues;
     try {
       issues = await this.#fetcher.fetchIssues();
     } catch (err) {
       logger.error('fetch failed', { error: err.message });
-      return this.#finalizeRun({ total: 0, classified: 0, labeled: 0, commented: 0, errors: 1 });
+      return this.#finalizeRun({ total: 0, skipped: 0, classified: 0, labeled: 0, commented: 0, errors: 1 });
     }
     logger.info('fetched issues for triage', { count: issues.length });
 
     if (issues.length === 0) {
-      return this.#finalizeRun({ total: 0, classified: 0, labeled: 0, commented: 0, errors: 0 });
+      return this.#finalizeRun({ total: 0, skipped: 0, classified: 0, labeled: 0, commented: 0, errors: 0 });
     }
 
     const details = [];
+    let skipped = 0;
     let classified = 0;
     let labeled = 0;
     let commented = 0;
     let errors = 0;
 
     for (const issue of issues) {
+      if (skipLabeled && hasPriorityLabel(issue.labels)) {
+        skipped++;
+        logger.info('skipped already-labeled issue', { number: issue.number, labels: issue.labels });
+        details.push({ number: issue.number, skipped: true });
+        continue;
+      }
+
       try {
         const result = await this.#triageIssue(issue);
         details.push({ number: issue.number, ...result });
@@ -117,6 +129,7 @@ export class TriageAgent extends Agent {
 
     logger.info('triage complete', {
       total: issues.length,
+      skipped,
       classified,
       labeled,
       commented,
@@ -125,6 +138,7 @@ export class TriageAgent extends Agent {
 
     return this.#finalizeRun({
       total: issues.length,
+      skipped,
       classified,
       labeled,
       commented,

@@ -242,6 +242,86 @@ describe('TriageAgent', () => {
     assert.equal(result.total, 0);
   });
 
+ it('run — skips issues that already have a priority:P* label (skipLabeled=true)', async () => {
+    const labeledIssue = { ...sampleIssue, number: 10, labels: ['bug', 'priority:P1'] };
+    const unlabeledIssue = { ...sampleIssue, number: 11, labels: ['bug'] };
+    const classifyCalls = [];
+    const tools = {
+      fetcher: { async fetchIssues() { return [labeledIssue, unlabeledIssue]; } },
+      classifier: {
+        async classify(issue) { classifyCalls.push(issue.title); return { priority: 'P2', area: 'bug', severity: 'minor', summary: 'ok' }; },
+      },
+      responder: {
+        async applyLabels() { return ['priority:P2']; },
+        async postComment() { return true; },
+      },
+    };
+
+    const agent = new TriageAgent({ ...baseConfig, _tools: tools, skipLabeled: true });
+    await agent.initialize();
+    const result = await agent.run();
+
+    assert.equal(result.total, 2);
+    assert.equal(result.skipped, 1);
+    assert.equal(result.classified, 1);
+    assert.equal(result.labeled, 1);
+    assert.equal(result.commented, 1);
+    assert.equal(result.errors, 0);
+    // Only the unlabeled issue was classified
+    assert.equal(classifyCalls.length, 1);
+    assert.equal(result.details[0].number, 10);
+    assert.equal(result.details[0].skipped, true);
+  });
+
+  it('run — does not skip labeled issues when skipLabeled=false', async () => {
+    const labeledIssue = { ...sampleIssue, number: 20, labels: ['bug', 'priority:P1'] };
+    const classifyCalls = [];
+    const tools = {
+      fetcher: { async fetchIssues() { return [labeledIssue]; } },
+      classifier: {
+        async classify() { classifyCalls.push(1); return { priority: 'P2', area: 'bug', severity: 'minor', summary: 'ok' }; },
+      },
+      responder: {
+        async applyLabels() { return ['priority:P2']; },
+        async postComment() { return true; },
+      },
+    };
+
+    const agent = new TriageAgent({ ...baseConfig, _tools: tools, skipLabeled: false });
+    await agent.initialize();
+    const result = await agent.run();
+
+    assert.equal(result.total, 1);
+    assert.equal(result.skipped, 0);
+    assert.equal(result.classified, 1);
+    assert.equal(classifyCalls.length, 1);
+  });
+
+  it('run — skipLabeled defaults to true when not specified', async () => {
+    const labeledIssue = { ...sampleIssue, number: 30, labels: ['priority:P2'] };
+    const classifyCalls = [];
+    const tools = {
+      fetcher: { async fetchIssues() { return [labeledIssue]; } },
+      classifier: {
+        async classify() { classifyCalls.push(1); return { priority: 'P3', area: 'other', severity: 'minor', summary: 'ok' }; },
+      },
+      responder: {
+        async applyLabels() { return ['priority:P3']; },
+        async postComment() { return true; },
+      },
+    };
+
+    // No skipLabeled in config — should default to true
+    const agent = new TriageAgent({ ...baseConfig, _tools: tools });
+    await agent.initialize();
+    const result = await agent.run();
+
+    assert.equal(result.total, 1);
+    assert.equal(result.skipped, 1);
+    assert.equal(result.classified, 0);
+    assert.equal(classifyCalls.length, 0);
+  });
+
  it('creates classifier from gcpProject when _tools.classifier not provided', async () => {
    // Covers the _tools?.classifier undefined + gcpProject truthy branch
     const previousCredentials = process.env.GOOGLE_APPLICATION_CREDENTIALS;

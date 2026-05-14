@@ -12,6 +12,16 @@ import { Octokit } from '@octokit/rest';
 import { logger } from '../utils/logger.mjs';
 
 /**
+ * Check whether an issue's existing labels already include a priority label.
+ *
+ * @param {string[]} labels - current labels on the issue
+ * @returns {boolean} true if any label matches `priority:P*`
+ */
+export function hasPriorityLabel(labels) {
+  return labels.some((l) => /^priority:P\d+$/i.test(l));
+}
+
+/**
  * Map classification results to GitHub label names.
  *
  * @param {{ priority: string, area: string, severity: string }} classification
