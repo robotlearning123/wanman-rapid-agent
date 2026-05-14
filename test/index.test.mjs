@@ -15,7 +15,7 @@
 import { describe, it, afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { loadConfig, validateConfig, main } from '../src/index.mjs';
+import { loadConfig, validateConfig, main, parseRepos } from '../src/index.mjs';
 
 const mockTools = {
   fetcher: { async fetchIssues() { return []; } },
@@ -263,5 +263,109 @@ describe('validateConfig', () => {
     const config = { token: 'ghp_test', gcpProject: 'test-project' };
     const result = validateConfig(config);
     assert.equal(result, config);
+  });
+});
+
+describe('parseRepos', () => {
+  it('parses single repo', () => {
+    assert.deepEqual(parseRepos('org/repo'), ['org/repo']);
+  });
+
+  it('parses comma-separated repos', () => {
+    assert.deepEqual(parseRepos('org/repo1,org/repo2,org/repo3'), ['org/repo1', 'org/repo2', 'org/repo3']);
+  });
+
+  it('trims whitespace around repos', () => {
+    assert.deepEqual(parseRepos(' org/repo1 , org/repo2 '), ['org/repo1', 'org/repo2']);
+  });
+
+  it('filters out empty segments', () => {
+    assert.deepEqual(parseRepos('org/repo1,,org/repo2,'), ['org/repo1', 'org/repo2']);
+  });
+
+  it('returns empty array for empty string', () => {
+    assert.deepEqual(parseRepos(''), []);
+  });
+});
+
+describe('multi-repo main', () => {
+  const originalCreds = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+  beforeEach(() => {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = '/tmp/test-key.json';
+  });
+
+  afterEach(() => {
+    if (originalCreds !== undefined) process.env.GOOGLE_APPLICATION_CREDENTIALS = originalCreds;
+    else delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  });
+
+  it('runs triage for each comma-separated repo', async () => {
+    const reposSeen = [];
+    const multiTools = {
+      fetcher: { async fetchIssues() { return []; } },
+      classifier: { async classify() { return { priority: 'P3', area: 'other', severity: 'minor', summary: 'test' }; } },
+      responder: { async applyLabels() { return []; }, async postComment() { return true; } },
+    };
+
+    const result = await main({
+      repo: 'org/repo1,org/repo2',
+      token: 'ghp_test',
+      dryRun: true,
+      gcpProject: 'test-project',
+      _tools: multiTools,
+    });
+
+    assert.equal(result.repoCount, 2);
+    assert.deepEqual(result.repos, ['org/repo1', 'org/repo2']);
+    assert.equal(result.perRepo.length, 2);
+    assert.equal(result.perRepo[0].repo, 'org/repo1');
+    assert.equal(result.perRepo[1].repo, 'org/repo2');
+  });
+
+  it('aggregates totals across repos', async () => {
+    const issue1 = { number: 1, title: 'Bug', body: 'b', labels: [], url: 'https://github.com/org/r1/issues/1', createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z', author: 'dev' };
+    const issue2 = { number: 2, title: 'Feature', body: 'f', labels: [], url: 'https://github.com/org/r2/issues/2', createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z', author: 'dev' };
+
+    let callIdx = 0;
+    const multiTools = {
+      fetcher: {
+        async fetchIssues() {
+          callIdx++;
+          return callIdx === 1 ? [issue1] : [issue2];
+        },
+      },
+      classifier: { async classify() { return { priority: 'P2', area: 'bug', severity: 'minor', summary: 'ok' }; } },
+      responder: { async applyLabels() { return ['priority:P2']; }, async postComment() { return true; } },
+    };
+
+    const result = await main({
+      repo: 'org/repo1,org/repo2',
+      token: 'ghp_test',
+      dryRun: true,
+      gcpProject: 'test-project',
+      _tools: multiTools,
+    });
+
+    assert.equal(result.total, 2);
+    assert.equal(result.classified, 2);
+    assert.equal(result.labeled, 2);
+    assert.equal(result.commented, 2);
+    assert.equal(result.errors, 0);
+  });
+
+  it('returns single-repo result shape when only one repo', async () => {
+    const result = await main({
+      repo: 'org/single-repo',
+      token: 'ghp_test',
+      dryRun: true,
+      gcpProject: 'test-project',
+      _tools: mockTools,
+    });
+
+    // Single repo should NOT have multi-repo fields
+    assert.equal(result.total, 0);
+    assert.equal(result.repoCount, undefined);
+    assert.equal(result.perRepo, undefined);
   });
 });
