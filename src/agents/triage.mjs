@@ -52,6 +52,7 @@ export class TriageAgent extends Agent {
    *   gcsPrefix?: string,
    *   dryRun?: boolean,
    *   skipLabeled?: boolean,
+   *   concurrency?: number,
    * }} config
    */
   constructor(config) {
@@ -80,11 +81,15 @@ export class TriageAgent extends Agent {
   /**
    * Main triage workflow. Called by Agent.run().
    *
+   * Processes issues concurrently with a configurable limit (CONCURRENCY env var
+   * or config.concurrency, default 3, max 20). Each issue is error-isolated.
+   *
    * @protected
    * @returns {Promise<TriageResult>}
    */
   async _onRun() {
     const skipLabeled = this.config.skipLabeled ?? true;
+    const concurrency = this.#resolveConcurrency();
 
     let issues;
     try {
@@ -93,7 +98,7 @@ export class TriageAgent extends Agent {
       logger.error('fetch failed', { error: err.message });
       return this.#finalizeRun({ total: 0, skipped: 0, classified: 0, labeled: 0, commented: 0, errors: 1 });
     }
-    logger.info('fetched issues for triage', { count: issues.length });
+    logger.info('fetched issues for triage', { count: issues.length, concurrency });
 
     if (issues.length === 0) {
       return this.#finalizeRun({ total: 0, skipped: 0, classified: 0, labeled: 0, commented: 0, errors: 0 });
@@ -101,29 +106,37 @@ export class TriageAgent extends Agent {
 
     const details = [];
     let skipped = 0;
-    let classified = 0;
-    let labeled = 0;
-    let commented = 0;
-    let errors = 0;
 
+    // Partition: skipped issues handled synchronously, rest go to concurrent pool
+    const toClassify = [];
     for (const issue of issues) {
       if (skipLabeled && hasPriorityLabel(issue.labels)) {
         skipped++;
         logger.info('skipped already-labeled issue', { number: issue.number, labels: issue.labels });
         details.push({ number: issue.number, skipped: true });
-        continue;
+      } else {
+        toClassify.push(issue);
       }
+    }
 
-      try {
-        const result = await this.#triageIssue(issue);
-        details.push({ number: issue.number, ...result });
-        classified++;
-        if (result.labelsApplied) labeled++;
-        if (result.commentPosted) commented++;
-      } catch (err) {
+    // Run classification concurrently with bounded concurrency
+    const results = await this.#runConcurrent(toClassify, concurrency);
+
+    let classified = 0;
+    let labeled = 0;
+    let commented = 0;
+    let errors = 0;
+
+    for (const { number, result, error } of results) {
+      if (error) {
         errors++;
-        logger.warn('issue triage failed', { number: issue.number, error: err.message });
-        details.push({ number: issue.number, error: err.message });
+        logger.warn('issue triage failed', { number, error });
+        details.push({ number, error });
+      } else {
+        details.push({ number, ...result });
+        classified++;
+        if (result.labelsApplied?.length) labeled++;
+        if (result.commentPosted) commented++;
       }
     }
 
@@ -134,6 +147,7 @@ export class TriageAgent extends Agent {
       labeled,
       commented,
       errors,
+      concurrency,
     });
 
     return this.#finalizeRun({
@@ -145,6 +159,48 @@ export class TriageAgent extends Agent {
       errors,
       details,
     });
+  }
+
+  /**
+   * Resolve concurrency limit from config or CONCURRENCY env var.
+   * @private
+   * @returns {number}
+   */
+  #resolveConcurrency() {
+    const raw = this.config.concurrency ?? process.env.CONCURRENCY;
+    const n = Number(raw);
+    if (!Number.isInteger(n) || n < 1) return 3;
+    return Math.min(n, 20);
+  }
+
+  /**
+   * Process issues concurrently with a bounded concurrency limit.
+   * Each issue is error-isolated — one failure does not affect others.
+   *
+   * @private
+   * @param {NormalizedIssue[]} issues
+   * @param {number} limit
+   * @returns {Promise<Array<{ number: number, result?: object, error?: string }>>}
+   */
+  async #runConcurrent(issues, limit) {
+    const results = [];
+    let idx = 0;
+
+    const next = async () => {
+      while (idx < issues.length) {
+        const current = idx++;
+        const issue = issues[current];
+        try {
+          const result = await this.#triageIssue(issue);
+          results[current] = { number: issue.number, result };
+        } catch (err) {
+          results[current] = { number: issue.number, error: err.message };
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: Math.min(limit, issues.length) }, () => next()));
+    return results;
   }
 
   /**
