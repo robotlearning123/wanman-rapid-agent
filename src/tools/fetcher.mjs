@@ -9,18 +9,39 @@ import { logger } from '../utils/logger.mjs';
 import { withRetry, DEFAULT_RETRY_DELAYS_MS } from '../utils/retry.mjs';
 
 /**
+ * Default threshold for remaining API calls before throttling kicks in.
+ * When x-ratelimit-remaining drops below this value, the fetcher will
+ * pause before requesting the next page.
+ */
+export const DEFAULT_RATE_LIMIT_THRESHOLD = 100;
+
+/**
+ * Default delay (ms) to sleep when approaching the rate limit.
+ */
+export const DEFAULT_RATE_LIMIT_DELAY_MS = 1000;
+
+/**
  * Create a fetcher bound to a specific repository.
  *
- * @param {{ token?: string, repo: string, retryDelaysMs?: number[], retrySleep?: function }} opts
+ * @param {{ token?: string, repo: string, client?: object, retryDelaysMs?: number[], retrySleep?: function, rateLimitThreshold?: number, rateLimitDelayMs?: number, sleepFn?: function }} opts
  * @returns {{ fetchIssues(): Promise<NormalizedIssue[]> }}
  */
-export function createFetcher({ token, repo, client, retryDelaysMs = DEFAULT_RETRY_DELAYS_MS, retrySleep }) {
+export function createFetcher({
+  token,
+  repo,
+  client,
+  retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
+  retrySleep,
+  rateLimitThreshold = Number(process.env.RATE_LIMIT_THRESHOLD) || DEFAULT_RATE_LIMIT_THRESHOLD,
+  rateLimitDelayMs = DEFAULT_RATE_LIMIT_DELAY_MS,
+  sleepFn = (ms) => new Promise((r) => setTimeout(r, ms)),
+}) {
   const octokit = client ?? new Octokit({ auth: token });
 
   return {
     /**
      * Fetch all open issues (not PRs) from the target repo.
-     * Automatically paginates through all pages.
+     * Uses manual pagination to track rate limit headers per page.
      *
      * @returns {Promise<NormalizedIssue[]>}
      */
@@ -30,35 +51,60 @@ export function createFetcher({ token, repo, client, retryDelaysMs = DEFAULT_RET
         throw new Error(`Invalid repository format: "${repo}". Expected "owner/repo".`);
       }
 
-      logger.info('fetching issues', { repo });
+      logger.info('fetching issues', { repo, rateLimitThreshold });
 
-      const issues = await withRetry(
-        () => octokit.paginate(octokit.rest.issues.listForRepo, {
-          owner,
-          repo: repository,
-          state: 'open',
-          per_page: 100,
-        }),
-        {
-          delaysMs: retryDelaysMs,
-          sleepFn: retrySleep,
-          onRetry: ({ attempt, nextAttempt, delayMs, error }) => {
-            logger.warn('fetch issues retry scheduled', {
-              attempt,
-              nextAttempt,
-              delayMs,
-              error: error.message,
-            });
+      const allIssues = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const response = await withRetry(
+          () => octokit.rest.issues.listForRepo({
+            owner,
+            repo: repository,
+            state: 'open',
+            per_page: 100,
+            page,
+          }),
+          {
+            delaysMs: retryDelaysMs,
+            sleepFn: retrySleep,
+            onRetry: ({ attempt, nextAttempt, delayMs, error }) => {
+              logger.warn('fetch issues retry scheduled', {
+                attempt,
+                nextAttempt,
+                delayMs,
+                error: error.message,
+              });
+            },
           },
-        },
-      );
+        );
+
+        const issues = response.data;
+        allIssues.push(...issues);
+
+        // Check rate limit from response headers
+        const remaining = parseInt(response.headers['x-ratelimit-remaining'] ?? '5000', 10);
+        if (remaining < rateLimitThreshold) {
+          logger.warn('approaching rate limit, throttling', {
+            remaining,
+            threshold: rateLimitThreshold,
+            delayMs: rateLimitDelayMs,
+            nextPage: page + 1,
+          });
+          await sleepFn(rateLimitDelayMs);
+        }
+
+        hasMore = issues.length === 100;
+        page++;
+      }
 
       // Filter out pull requests (GitHub API returns PRs as issues)
-      const openIssues = issues.filter(
+      const openIssues = allIssues.filter(
         (issue) => !issue.pull_request
       );
 
-      logger.info('fetched issues', { repo, total: issues.length, issues: openIssues.length });
+      logger.info('fetched issues', { repo, total: allIssues.length, issues: openIssues.length });
 
       return openIssues.map((raw) => sanitizeIssue(normalize(raw)));
     },
