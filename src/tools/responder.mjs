@@ -49,7 +49,10 @@ export function classificationToLabels(classification) {
  * @param {{ priority: string, area: string, severity: string, summary: string }} classification
  * @returns {string} markdown comment body
  */
-export function buildComment(classification) {
+export function buildComment(classification, { repo } = {}) {
+  const agentUrl = repo
+    ? `https://github.com/${repo}`
+    : 'https://github.com/robotlearning123/wanman-rapid-agent';
   return [
     '### Issue Triage Report',
     '',
@@ -61,7 +64,7 @@ export function buildComment(classification) {
     '',
     `> ${classification.summary}`,
     '',
-    '_Automated by [wanman-rapid-agent](https://github.com/your-org/wanman-rapid-agent) — classify issues with Vertex AI_',
+    `_Automated by [wanman-rapid-agent](${agentUrl}) — classify issues with Vertex AI_`,
   ].join('\n');
 }
 

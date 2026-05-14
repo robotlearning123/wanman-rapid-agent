@@ -165,7 +165,7 @@ export class TriageAgent extends Agent {
     const labelsApplied = await this.#responder.applyLabels(issue.number, classification);
 
     // Post comment
-    const comment = buildComment(classification);
+    const comment = buildComment(classification, { repo: this.config.repo });
     const commentPosted = await this.#responder.postComment(issue.number, comment);
 
     return { classification, labelsApplied, commentPosted };
