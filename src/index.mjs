@@ -33,6 +33,34 @@ export function loadConfig() {
 }
 
 /**
+ * Validate that all required configuration values are present.
+ * Collects ALL missing vars before throwing so the user sees
+ * a complete fix list in one shot.
+ *
+ * @param {object} config - the config object from loadConfig()
+ * @returns {object} the same config object if valid
+ * @throws {Error} listing all missing required variables
+ */
+export function validateConfig(config) {
+  const missing = [];
+  const liveMode = config.dryRun === false;
+
+  if (!liveMode) {
+    return config;
+  }
+
+  if (!config.token) missing.push('GITHUB_TOKEN');
+  if (!config.gcpProject) missing.push('GOOGLE_CLOUD_PROJECT');
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) missing.push('GOOGLE_APPLICATION_CREDENTIALS');
+
+  if (missing.length > 0) {
+    throw new Error(`Missing required configuration: ${missing.join(', ')}`);
+  }
+
+  return config;
+}
+
+/**
  * Main orchestrator — creates, initializes, runs, and reports the TriageAgent.
  *
  * @param {object} [configOverride] - override config (useful for testing)
@@ -40,6 +68,7 @@ export function loadConfig() {
  */
 export async function main(configOverride) {
   const config = configOverride ?? loadConfig();
+  validateConfig(config);
 
   logger.info('wanman-rapid-agent starting', {
     repo: config.repo,

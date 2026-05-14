@@ -64,6 +64,21 @@ describe('buildComment', () => {
     const comment = buildComment({ priority: 'P3', area: 'docs', severity: 'minor', summary: '' });
     assert.ok(comment.includes('> '));
   });
+
+  it('uses repo URL when repo option provided', () => {
+    const comment = buildComment(
+      { priority: 'P2', area: 'feature', severity: 'major', summary: 'test' },
+      { repo: 'myorg/myrepo' },
+    );
+    assert.ok(comment.includes('https://github.com/myorg/myrepo'));
+    assert.ok(!comment.includes('your-org'));
+  });
+
+  it('falls back to default URL when no repo provided', () => {
+    const comment = buildComment({ priority: 'P2', area: 'feature', severity: 'major', summary: 'test' });
+    assert.ok(comment.includes('https://github.com/robotlearning123/wanman-rapid-agent'));
+    assert.ok(!comment.includes('your-org'));
+  });
 });
 
 describe('createResponder', () => {

@@ -353,4 +353,152 @@ describe('TriageAgent', () => {
       }
     }
  });
+
+  // --- Concurrent classification tests ---
+
+  it('run — processes multiple issues concurrently (config.concurrency)', async () => {
+    const callOrder = [];
+    const issues = [
+      { ...sampleIssue, number: 1 },
+      { ...sampleIssue, number: 2 },
+      { ...sampleIssue, number: 3 },
+      { ...sampleIssue, number: 4 },
+    ];
+    const tools = {
+      fetcher: { async fetchIssues() { return issues; } },
+      classifier: {
+        async classify(issue) {
+          callOrder.push(`classify:${issue.title}`);
+          await new Promise(r => setTimeout(r, 5));
+          return { priority: 'P3', area: 'other', severity: 'minor', summary: 'ok' };
+        },
+      },
+      responder: {
+        async applyLabels(n) { callOrder.push(`label:${n}`); return ['priority:P3']; },
+        async postComment(n) { callOrder.push(`comment:${n}`); return true; },
+      },
+    };
+
+    const agent = new TriageAgent({ ...baseConfig, _tools: tools, concurrency: 2 });
+    await agent.initialize();
+    const result = await agent.run();
+
+    assert.equal(result.total, 4);
+    assert.equal(result.classified, 4);
+    assert.equal(result.errors, 0);
+    assert.equal(callOrder.filter(c => c.startsWith('classify:')).length, 4);
+  });
+
+  it('run — respects CONCURRENCY env var when config.concurrency not set', async () => {
+    const prevConcurrency = process.env.CONCURRENCY;
+    process.env.CONCURRENCY = '5';
+    try {
+      const tools = makeMockTools({ issues: [sampleIssue] });
+      const agent = new TriageAgent({ ...baseConfig, _tools: tools });
+      await agent.initialize();
+      const result = await agent.run();
+      assert.equal(result.total, 1);
+      assert.equal(result.classified, 1);
+    } finally {
+      if (prevConcurrency === undefined) {
+        delete process.env.CONCURRENCY;
+      } else {
+        process.env.CONCURRENCY = prevConcurrency;
+      }
+    }
+  });
+
+  it('run — defaults to concurrency 3 when nothing configured', async () => {
+    const prevConcurrency = process.env.CONCURRENCY;
+    delete process.env.CONCURRENCY;
+    try {
+      const tools = makeMockTools({ issues: [sampleIssue] });
+      const agent = new TriageAgent({ ...baseConfig, _tools: tools });
+      await agent.initialize();
+      const result = await agent.run();
+      assert.equal(result.classified, 1);
+    } finally {
+      if (prevConcurrency !== undefined) {
+        process.env.CONCURRENCY = prevConcurrency;
+      }
+    }
+  });
+
+  it('run — clamps concurrency to max 20', async () => {
+    const prevConcurrency = process.env.CONCURRENCY;
+    process.env.CONCURRENCY = '100';
+    try {
+      const tools = makeMockTools({ issues: [sampleIssue] });
+      const agent = new TriageAgent({ ...baseConfig, _tools: tools });
+      await agent.initialize();
+      const result = await agent.run();
+      assert.equal(result.classified, 1);
+    } finally {
+      if (prevConcurrency === undefined) {
+        delete process.env.CONCURRENCY;
+      } else {
+        process.env.CONCURRENCY = prevConcurrency;
+      }
+    }
+  });
+
+  it('run — isolates errors across concurrent issues', async () => {
+    const issues = [
+      { ...sampleIssue, number: 1, title: 'good issue' },
+      { ...sampleIssue, number: 2, title: 'bad issue' },
+      { ...sampleIssue, number: 3, title: 'another good' },
+    ];
+    const tools = {
+      fetcher: { async fetchIssues() { return issues; } },
+      classifier: {
+        async classify(issue) {
+          if (issue.title === 'bad issue') throw new Error('boom');
+          return { priority: 'P3', area: 'other', severity: 'minor', summary: 'ok' };
+        },
+      },
+      responder: {
+        async applyLabels() { return ['priority:P3']; },
+        async postComment() { return true; },
+      },
+    };
+
+    const agent = new TriageAgent({ ...baseConfig, _tools: tools, concurrency: 3 });
+    await agent.initialize();
+    const result = await agent.run();
+
+    assert.equal(result.total, 3);
+    assert.equal(result.classified, 2);
+    assert.equal(result.errors, 1);
+    const errorDetail = result.details.find(d => d.error);
+    assert.ok(errorDetail, 'should have an error detail entry');
+    assert.equal(errorDetail.error, 'boom');
+  });
+
+  it('run — handles concurrency=1 (sequential fallback)', async () => {
+    const callOrder = [];
+    const issues = [
+      { ...sampleIssue, number: 1 },
+      { ...sampleIssue, number: 2 },
+    ];
+    const tools = {
+      fetcher: { async fetchIssues() { return issues; } },
+      classifier: {
+        async classify() {
+          return { priority: 'P3', area: 'other', severity: 'minor', summary: 'ok' };
+        },
+      },
+      responder: {
+        async applyLabels(issueNumber) { callOrder.push(issueNumber); return ['priority:P3']; },
+        async postComment() { return true; },
+      },
+    };
+
+    const agent = new TriageAgent({ ...baseConfig, _tools: tools, concurrency: 1 });
+    await agent.initialize();
+    const result = await agent.run();
+
+    assert.equal(result.total, 2);
+    assert.equal(result.classified, 2);
+    assert.deepEqual(callOrder, [1, 2]);
+  });
 });
