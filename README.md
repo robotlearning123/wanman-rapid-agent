@@ -46,13 +46,13 @@ src/
     logger.mjs         Structured JSON logger (stderr)
     retry.mjs          Exponential backoff helper
 test/
-  *.test.mjs           Node.js test runner suite (148 tests)
+  *.test.mjs           Node.js test runner suite (234 tests)
 ```
 
 ### Agent Flow
 
-1. **Fetch** — Pull open issues from the target GitHub repository via Octokit, with retry for transient failures
-2. **Classify** — Send each issue body + title to Vertex AI for structured classification, with retry for transient failures
+1. **Fetch** — Pull open issues from the target GitHub repository via Octokit, with retry for transient failures and rate limit awareness
+2. **Classify** — Send each issue body + title to Vertex AI for structured classification, with retry for transient failures. Input is sanitized to strip control characters and prevent token inflation.
 3. **Respond** — Apply priority/area/severity labels; post a triage summary comment
 4. **Report** — Log results, optionally persist a JSON run report to Google Cloud Storage, and exit with appropriate status code
 
@@ -129,7 +129,7 @@ All configuration is via environment variables:
 | Variable | Required | Default | Description |
 |---|---|---|---|
 | `GITHUB_TOKEN` | Yes | — | GitHub PAT with repo access |
-| `GITHUB_REPOSITORY` | No | `example/repo` | Target repository (`owner/repo`) |
+| `GITHUB_REPOSITORY` | No | `example/repo` | Target repo(s) — comma-separated for multi-repo (`org/r1,org/r2`) |
 | `GOOGLE_CLOUD_PROJECT` | Yes | — | GCP project ID |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Yes | — | Path to service account key JSON |
 | `GOOGLE_CLOUD_LOCATION` | No | `us-central1` | Vertex AI region |
@@ -138,6 +138,8 @@ All configuration is via environment variables:
 | `VERTEX_MODEL` | No | `gemini-1.5-flash` | Vertex AI model name for classification |
 | `DRY_RUN` | No | `true` | Set to `false` to apply labels and post comments |
 | `CONCURRENCY` | No | `3` | Max parallel issue classifications (1–20) |
+| `RATE_LIMIT_THRESHOLD` | No | `100` | GitHub API remaining requests threshold to trigger throttling |
+| `RATE_LIMIT_DELAY_MS` | No | `1000` | Delay (ms) when rate limit threshold is reached |
 
 ## Usage
 
