@@ -4,7 +4,7 @@ Autonomous multi-agent system that triages GitHub issues using Google Cloud Vert
 
 ## What It Does
 
-wanman-rapid-agent connects to a GitHub repository, fetches open issues, classifies them by priority / area / severity using Vertex AI, and applies labels automatically. It runs as a standalone CLI or as a GitHub Action. When `GCS_BUCKET` is configured, each run also writes a JSON report to Google Cloud Storage for auditability and demo evidence.
+wanman-rapid-agent connects to a GitHub repository, fetches open issues, classifies them by priority / area / severity using Vertex AI, and applies labels automatically. It supports three modes: standalone CLI, GitHub Action (scheduled or event-driven), and real-time webhook server. When `GCS_BUCKET` is configured, each run also writes a JSON report to Google Cloud Storage for auditability and demo evidence.
 
 ## Architecture
 
@@ -20,13 +20,18 @@ wanman-rapid-agent connects to a GitHub repository, fetches open issues, classif
 │  GitHub  │    │  (orchestration + workflow)   │    │  (classify +    │
 │  Action  │    │                              │    │   summarize)    │
 └──────────┘    └──────────────────────────────┘    └─────────────────┘
-                          │
-                 ┌────────┼────────┬────────┐
-                 ▼        ▼        ▼        ▼
-            ┌────────┐┌────────┐┌──────────┐┌───────────────┐
-            │ Fetcher ││Classifier││Responder ││ Cloud Storage │
-            │ Tool    ││ Tool     ││ Tool     ││ Report Sink   │
-            └─────────┘└──────────┘└──────────┘└───────────────┘
+       ▲                   │
+       │          ┌────────┼────────┬────────┐
+       │          ▼        ▼        ▼        ▼
+       │     ┌────────┐┌────────┐┌──────────┐┌───────────────┐
+       │     │ Fetcher ││Classifier││Responder ││ Cloud Storage │
+       │     │ Tool    ││ Tool     ││ Tool     ││ Report Sink   │
+       │     └─────────┘└──────────┘└──────────┘└───────────────┘
+       │
+┌──────┴──────────┐
+│  Webhook Server │  ← real-time triage on issue events
+│  (HMAC verify)  │
+└─────────────────┘
 ```
 
 ### Directory Layout
@@ -34,6 +39,7 @@ wanman-rapid-agent connects to a GitHub repository, fetches open issues, classif
 ```
 src/
   index.mjs            Entry point — CLI bootstrap
+  webhook.mjs          GitHub webhook handler — HMAC verification + real-time triage
   agents/
     base.mjs           AgentBase — abstract state machine, events, error handling
     triage.mjs         TriageAgent — main orchestration loop
@@ -140,6 +146,7 @@ All configuration is via environment variables:
 | `CONCURRENCY` | No | `3` | Max parallel issue classifications (1–20) |
 | `RATE_LIMIT_THRESHOLD` | No | `100` | GitHub API remaining requests threshold to trigger throttling |
 | `RATE_LIMIT_DELAY_MS` | No | `1000` | Delay (ms) when rate limit threshold is reached |
+| `WEBHOOK_SECRET` | No | — | GitHub webhook secret for HMAC-SHA256 signature verification |
 
 ## Usage
 
@@ -191,6 +198,44 @@ jobs:
           DRY_RUN: "false"
 ```
 
+### Webhook Server (real-time triage)
+
+For real-time triage on issue events, run the webhook server:
+
+```js
+import { startWebhookServer } from './src/webhook.mjs';
+
+const triageConfig = {
+  repo: 'myorg/myrepo',
+  token: process.env.GITHUB_TOKEN,
+  gcpProject: process.env.GOOGLE_CLOUD_PROJECT,
+  dryRun: false,
+};
+
+startWebhookServer({
+  port: 3000,
+  secret: process.env.WEBHOOK_SECRET,
+  triageConfig,
+});
+```
+
+Or use `createWebhookHandler()` to integrate with any Node.js HTTP server (Express, Fastify, etc.):
+
+```js
+import { createWebhookHandler } from './src/webhook.mjs';
+
+const handler = createWebhookHandler({ secret, triageConfig });
+// handler.handleRequest(req, res) processes incoming webhooks
+```
+
+Configure the webhook in your GitHub repo settings:
+1. **Payload URL**: `http://your-server:3000/`
+2. **Content type**: `application/json`
+3. **Secret**: the value of `WEBHOOK_SECRET`
+4. **Events**: Issues
+
+The handler validates HMAC-SHA256 signatures with constant-time comparison, filters for `issues.opened` and `issues.edited` events, and dispatches through the same TriageAgent pipeline.
+
 ## Testing
 
 ```bash
@@ -207,6 +252,7 @@ The test suite uses the [Node.js built-in test runner](https://nodejs.org/api/te
 - Retry: exponential backoff behavior for transient failures
 - Logger: structured output format
 - Integration: end-to-end dry-run flow
+- Webhook: HMAC signature verification, event filtering, payload extraction, HTTP response paths
 
 ## How It Uses Google Cloud
 
