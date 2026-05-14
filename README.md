@@ -137,6 +137,7 @@ All configuration is via environment variables:
 | `GCS_PREFIX` | No | `triage-runs` | Cloud Storage object prefix for run reports |
 | `VERTEX_MODEL` | No | `gemini-1.5-flash` | Vertex AI model name for classification |
 | `DRY_RUN` | No | `true` | Set to `false` to apply labels and post comments |
+| `CONCURRENCY` | No | `3` | Max parallel issue classifications (1–20) |
 
 ## Usage
 
