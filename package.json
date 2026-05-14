@@ -1,6 +1,6 @@
 {
   "name": "wanman-rapid-agent",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Multi-agent system for autonomous GitHub issue triage using Google Cloud Vertex AI",
   "type": "module",
   "main": "src/index.mjs",
