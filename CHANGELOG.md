@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-05-14
+
+### Added
+
+- Input sanitization — `sanitizeIssue()` strips control characters, truncates bodies/titles/labels, and caps label counts to prevent token inflation and XSS in AI prompts
+- `stripControls()`, `truncate()`, `sanitizeLabels()` helpers in fetcher for defense-in-depth
+- Rate limit awareness — fetcher tracks `x-ratelimit-remaining` headers from GitHub API, auto-throttles with configurable delay when approaching limits
+- `RATE_LIMIT_THRESHOLD` (default: 100) and `RATE_LIMIT_DELAY_MS` (default: 1000) environment variables for rate limit tuning
+- Multi-repo triage — comma-separated `GITHUB_REPOSITORY` (e.g., `org/repo1,org/repo2`) runs TriageAgent per repo sequentially and aggregates results
+- `parseRepos()` utility to split and sanitize comma-separated repo strings
+- Backward-compatible result shape: single-repo returns original structure, multi-repo adds `repoCount`, `repos`, and `perRepo` fields
+- 54 new tests across sanitization, rate limiting, multi-repo, and fetcher modules (229 total on master before this release)
+
+### Project Stats
+
+| Metric | Value |
+|--------|-------|
+| Source files | 9 |
+| Test files | 12 |
+| Tests | 234 (all passing) |
+| Dependencies | 3 (`@octokit/rest`, `@google-cloud/storage`, `google-auth-library`) |
+| Dev dependencies | 3 (`c8`, `eslint`, `eslint-plugin-n`) |
+| CI | GitHub Actions (Node 18, 20), plus local lint gate |
+
 ## [0.1.2] - 2026-05-14
 
 ### Added
@@ -90,6 +114,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Dev dependencies | 1 (`c8`) |
 | CI | GitHub Actions (Node 18, 20) |
 
+[0.1.3]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.3
 [0.1.2]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.2
 [0.1.1]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.1
 [0.1.0]: https://github.com/robotlearning123/wanman-rapid-agent/releases/tag/v0.1.0
