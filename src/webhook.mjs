@@ -145,7 +145,15 @@ export function createWebhookHandler({ secret, triageConfig }) {
 
       try {
         const repo = payload.repository?.full_name ?? triageConfig.repo;
-        const agent = new TriageAgent({ ...triageConfig, repo });
+        const tools = {
+          ...triageConfig._tools,
+          fetcher: {
+            async fetchIssues() {
+              return [issue];
+            },
+          },
+        };
+        const agent = new TriageAgent({ ...triageConfig, repo, _tools: tools });
         await agent.initialize();
         const result = await agent.run();
 

@@ -251,6 +251,9 @@ describe('createWebhookHandler', () => {
     const parsed = JSON.parse(res.body);
     assert.equal(parsed.status, 'triaged');
     assert.equal(parsed.issue, 1);
+    assert.equal(parsed.result.total, 1);
+    assert.equal(parsed.result.classified, 1);
+    assert.equal(parsed.result.details[0].number, 1);
   });
 
   it('returns 400 for invalid JSON', async () => {
