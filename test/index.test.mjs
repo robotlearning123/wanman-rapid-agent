@@ -301,7 +301,6 @@ describe('multi-repo main', () => {
   });
 
   it('runs triage for each comma-separated repo', async () => {
-    const reposSeen = [];
     const multiTools = {
       fetcher: { async fetchIssues() { return []; } },
       classifier: { async classify() { return { priority: 'P3', area: 'other', severity: 'minor', summary: 'test' }; } },

@@ -138,7 +138,7 @@ describe('createRunStorage', () => {
 
   it('skips persistence when bucketName is empty string', async () => {
     const sink = createRunStorage({ bucketName: '' });
-    const result = await sink.saveRunReport({ repo: 'test/repo' });
+    await sink.saveRunReport({ repo: 'test/repo' });
     assert.equal(sink.enabled, false);
   });
 
