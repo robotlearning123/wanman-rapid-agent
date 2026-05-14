@@ -12,10 +12,10 @@
  *   3. Agent state machine: run() transitions RUNNING → IDLE on success, not RUNNING → STOPPED.
  */
 
-import { describe, it, afterEach } from 'node:test';
+import { describe, it, afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { loadConfig, main } from '../src/index.mjs';
+import { loadConfig, validateConfig, main } from '../src/index.mjs';
 
 const mockTools = {
   fetcher: { async fetchIssues() { return []; } },
@@ -90,10 +90,22 @@ describe('loadConfig', () => {
 describe('main', () => {
   const testConfig = {
     repo: 'example/repo',
+    token: 'ghp_test',
     dryRun: true,
     gcpProject: 'test-project',
     _tools: mockTools,
   };
+
+  const originalCreds = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+  beforeEach(() => {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = '/tmp/test-key.json';
+  });
+
+  afterEach(() => {
+    if (originalCreds !== undefined) process.env.GOOGLE_APPLICATION_CREDENTIALS = originalCreds;
+    else delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  });
 
   it('returns triage results with correct shape', async () => {
     const result = await main(testConfig);
@@ -128,6 +140,7 @@ describe('main', () => {
   it('returns error result when fetcher fails (agent handles internally)', async () => {
     const result = await main({
       repo: 'example/repo',
+      token: 'ghp_test',
       dryRun: true,
       gcpProject: 'test-project',
       _tools: {
@@ -144,16 +157,20 @@ describe('main', () => {
 
   it('calls process.exit(1) on initialize failure', async () => {
     const originalExit = process.exit;
+    const originalCreds = process.env.GOOGLE_APPLICATION_CREDENTIALS;
     let exitCode = null;
     process.exit = (code) => {
       exitCode = code;
       throw new Error(`process.exit(${code})`);
     };
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = '/tmp/test-key.json';
 
     try {
       await main({
         repo: 'invalid-format',
+        token: 'ghp_test',
         dryRun: true,
+        gcpProject: 'test-project',
         _tools: {
           fetcher: { async fetchIssues() { return []; } },
           classifier: { async classify() { return { priority: 'P3', area: 'other', severity: 'minor', summary: 't' }; } },
@@ -163,6 +180,8 @@ describe('main', () => {
       assert.ok(err.message.includes('process.exit'), `unexpected error: ${err.message}`);
     } finally {
       process.exit = originalExit;
+      if (originalCreds !== undefined) process.env.GOOGLE_APPLICATION_CREDENTIALS = originalCreds;
+      else delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
     }
 
     assert.equal(exitCode, 1, 'should call process.exit(1)');
@@ -174,10 +193,64 @@ describe('main', () => {
       cwd: projectRoot,
       encoding: 'utf8',
       timeout: 10000,
-      env: { ...process.env, DRY_RUN: 'true', GITHUB_REPOSITORY: 'invalid-format' },
+      env: {
+        ...process.env,
+        DRY_RUN: 'true',
+        GITHUB_REPOSITORY: 'invalid-format',
+        GITHUB_TOKEN: 'ghp_test',
+        GOOGLE_CLOUD_PROJECT: 'test-project',
+        GOOGLE_APPLICATION_CREDENTIALS: '/tmp/test-key.json',
+      },
     });
 
     const stderr = result.stderr || '';
     assert.ok(stderr.includes('wanman-rapid-agent starting'), 'auto-run guard should call main()');
+  });
+});
+
+describe('validateConfig', () => {
+  const originalCreds = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+  afterEach(() => {
+    if (originalCreds !== undefined) process.env.GOOGLE_APPLICATION_CREDENTIALS = originalCreds;
+    else delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  });
+
+  it('passes when all required vars are set', () => {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = '/tmp/test-key.json';
+    const config = {
+      token: 'ghp_test',
+      gcpProject: 'test-project',
+    };
+    const result = validateConfig(config);
+    assert.equal(result, config);
+  });
+
+  it('throws listing all missing required vars', () => {
+    delete process.env.GOOGLE_APPLICATION_CREDENTIALS;
+    const config = { token: '', gcpProject: '' };
+    assert.throws(
+      () => validateConfig(config),
+      (err) => err.message.includes('GITHUB_TOKEN')
+        && err.message.includes('GOOGLE_CLOUD_PROJECT')
+        && err.message.includes('GOOGLE_APPLICATION_CREDENTIALS'),
+    );
+  });
+
+  it('throws for missing GITHUB_TOKEN only', () => {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = '/tmp/test-key.json';
+    const config = { token: '', gcpProject: 'test-project' };
+    assert.throws(
+      () => validateConfig(config),
+      (err) => err.message.includes('GITHUB_TOKEN')
+        && !err.message.includes('GOOGLE_CLOUD_PROJECT'),
+    );
+  });
+
+  it('checks env var presence only, not file existence', () => {
+    process.env.GOOGLE_APPLICATION_CREDENTIALS = '/nonexistent/path/key.json';
+    const config = { token: 'ghp_test', gcpProject: 'test-project' };
+    const result = validateConfig(config);
+    assert.equal(result, config);
   });
 });
